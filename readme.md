@@ -1,39 +1,58 @@
-# ct-gql-starter
+<p align="center">
+  <a href="https://commercetools.com/">
+    <img alt="commercetools logo" src="https://unpkg.com/@commercetools-frontend/assets/logos/commercetools_primary-logo_horizontal_RGB.png">
+  </a>
+</p>
 
-ct-gql-starter is a graphql starter for commercetools.
-The project demonstrates how to fetch product data and display it as product cards.
+# Pizza Ordering Application
 
-# Functionality
-The project uses Apollo Client, a powerful GraphQL client library, to fetch product data from the Commercetools GraphQL API. The index.js file contains the GraphQL query and the code to render product cards dynamically based on the fetched data.
+A modern, responsive pizza ordering application powered by Commercetools API. This application allows customers to customize and order pizzas with various toppings and crust styles.
 
-Each product card displays the following information:
+## Features
 
-- Product Image: The main product image.
-- Product Name: The name of the product.
-- SKU: The product's Stock Keeping Unit.
-- Price: The price of the product in USD.
+### User Interface
+- Modern, responsive design with Material UI components
+- Sticky pizza visualization that follows the user while scrolling
+- Real-time visual pizza builder showing selected toppings
+- Store information and cart accessibility in the header
 
-Technologies Used
-- Apollo Client: Used for handling GraphQL queries and data fetching.
-- Tailwind CSS: Used for styling the product cards and layout.
-- GraphQL Query
+### Pizza Customization
+- Select from multiple crust styles (Hand Tossed, Thin Crust)
+- Add or remove various toppings (Pepperoni, Mushroom, Bacon, etc.)
+- Real-time price updates based on selections
+- Order summary showing all selected items and prices
 
-The GraphQL query is defined in the index.js file. It fetches product data, including the product name, SKU, price, and image, from the Commercetools GraphQL API.
+### Cart Management
+- Add multiple customized pizzas to cart
+- View detailed cart with all customizations
+- Update quantities or remove items
 
-# Notes
+### Ordering
+- Instant order capability with one-click checkout
+- Choose between pickup and delivery methods
+- Order confirmation with estimated pickup/delivery times
+- Randomly generated customer information for demo purposes
 
-- ct sandbox
-- Uses @apollo/client
-- npm install @apollo/client graphql
-- Note that apollo duplicates the first result to evert node in array of edges, there are two ways to solve this in index.js
-- Runs using Parcel Bundler
-- npm install --save-dev parcel-bundler
-- code is written so that bearer token needs to be created manually on expiration
-- Modify package.json to include:
-"scripts": {
-  "start": "parcel index.html"
-}
+### Technical Features
+- React with TypeScript for type safety
+- Material UI for consistent design components
+- Commercetools API integration for product and order management
+- Custom SVG-based pizza visualization that updates in real-time
+- Responsive design for mobile and desktop
+
+## Development
+
+### Getting Started
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Start the development server with `npm run dev`
+
+### Project Structure
+- `/client`: Frontend React application
+- `/src`: Backend API services and Commercetools integration
+- `/client/src/components`: React components for the UI
+- `/client/src/api`: API client for Commercetools interactions
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
+[MIT License](LICENSE)

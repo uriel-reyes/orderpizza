@@ -1,20 +1,28 @@
 {
-  "name": "commercetools",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "parcel index.html"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "parcel-bundler": "^1.12.5"
-  },
   "dependencies": {
-    "@apollo/client": "^3.7.17",
-    "graphql": "^16.7.1"
+    "@commercetools/platform-sdk": "^7.4.0",
+    "@commercetools/sdk-client-v2": "^3.0.0",
+    "@commercetools/ts-client": "^3.2.0",
+    "@graphql-tools/utils": "^10.8.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.0",
+    "graphql": "^16.11.0",
+    "graphql-tag": "^2.12.6",
+    "node-fetch": "^3.3.2",
+    "unsplash-js": "^7.0.19"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.25",
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.10",
+    "typescript": "^5.4.2"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "server": "nodemon server.js",
+    "client": "cd client && npm start",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "tsc && cd client && npm run build"
   }
 }

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+  <!-- Pizza crust outer circle -->
+  <circle cx="150" cy="150" r="140" fill="#e6be7e" stroke="#c49c58" stroke-width="5" />
+  
+  <!-- Pizza base - tomato sauce -->
+  <circle cx="150" cy="150" r="125" fill="#e73b2b" opacity="0.7" />
+  
+  <!-- Pizza cheese -->
+  <circle cx="150" cy="150" r="125" fill="#ffd763" opacity="0.7" />
+  
+  <!-- Crust details -->
+  <circle cx="150" cy="150" r="140" fill="none" stroke="#c49c58" stroke-width="3" stroke-dasharray="10,5" />
+  
+  <!-- Air bubbles in the crust -->
+  <circle cx="215" cy="85" r="5" fill="#d9aa6a" />
+  <circle cx="80" cy="120" r="6" fill="#d9aa6a" />
+  <circle cx="240" cy="180" r="5" fill="#d9aa6a" />
+  <circle cx="130" cy="250" r="6" fill="#d9aa6a" />
+  <circle cx="50" cy="190" r="4" fill="#d9aa6a" />
+</svg> 
