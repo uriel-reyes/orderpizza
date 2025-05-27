@@ -450,4 +450,181 @@ export const createOrder = async (
 /**
  * Default product ID to use when none is specified
  */
-export const DEFAULT_PRODUCT_ID = '98873a7d-1358-45ad-adb7-84ef4bf666af'; 
+export const DEFAULT_PRODUCT_ID = '98873a7d-1358-45ad-adb7-84ef4bf666af';
+
+/**
+ * Interface for ingredient products
+ */
+export interface IngredientProduct {
+  id: string;
+  key: string;
+  name: string;
+  category: 'cheese' | 'meat' | 'vegetable' | 'sauce';
+  isHalfPizzaConfigurable: boolean;
+  sku: string;
+}
+
+/**
+ * Interface for pizza base products
+ */
+export interface PizzaBaseProduct {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  availableCrusts: string[];
+  variants: Array<{
+    id: number;
+    key: string;
+    sku: string;
+    crustType: string;
+    price: {
+      centAmount: number;
+      currencyCode: string;
+    };
+    pricesByChannel?: { [channelId: string]: { centAmount: number; currencyCode: string } };
+    allPrices?: Array<{
+      value: { centAmount: number; currencyCode: string };
+      country: string;
+      channel?: { id: string };
+    }>;
+  }>;
+}
+
+/**
+ * Interface for pizza configuration
+ */
+export interface PizzaConfiguration {
+  baseProductId: string;
+  variantId: number;
+  size: string;
+  crustType: string;
+  sauce: {
+    productId: string;
+    amount: 'light' | 'normal' | 'extra';
+  };
+  cheese: {
+    whole?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra' };
+    left?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra' };
+    right?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra' };
+  };
+  toppings: {
+    whole?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra' }>;
+    left?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra' }>;
+    right?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra' }>;
+  };
+}
+
+/**
+ * Channel interface
+ */
+export interface Channel {
+  id: string;
+  key: string;
+  name: string;
+  roles: string[];
+}
+
+/**
+ * Fetch channels
+ */
+export const fetchChannels = async (): Promise<Channel[]> => {
+  try {
+    const response = await axios.get(`${API_BASE}/channels`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching channels:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch channels');
+  }
+};
+
+/**
+ * Fetches all pizza base products
+ * @returns Promise resolving to array of pizza base products
+ */
+export const fetchPizzaBases = async (channelId?: string): Promise<PizzaBaseProduct[]> => {
+  try {
+    const params = channelId ? { channel: channelId } : {};
+    const response = await axios.get(`${API_BASE}/products/pizza-bases`, { params });
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching pizza bases:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch pizza bases');
+  }
+};
+
+/**
+ * Fetches all ingredient products by category
+ * @param category - Optional category filter
+ * @returns Promise resolving to array of ingredient products
+ */
+export const fetchIngredients = async (category?: string): Promise<IngredientProduct[]> => {
+  try {
+    const url = category 
+      ? `${API_BASE}/products/ingredients?category=${category}`
+      : `${API_BASE}/products/ingredients`;
+    
+    const response = await axios.get<IngredientProduct[]>(url);
+    
+    // The server returns the data directly as an array, not wrapped in results
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw new Error(error.response.data.message || 'Failed to fetch ingredients');
+    }
+    throw new Error('Failed to fetch ingredients');
+  }
+};
+
+/**
+ * Creates a cart with a configured pizza
+ * @param configuration - The pizza configuration
+ * @param deliveryMethod - Optional delivery method
+ * @returns Promise resolving to the created cart
+ */
+export const createCartWithPizza = async (
+  configuration: PizzaConfiguration,
+  deliveryMethod?: 'pickup' | 'delivery'
+): Promise<Cart> => {
+  try {
+    const response = await axios.post<Cart>(`${API_BASE}/carts/pizza`, {
+      configuration,
+      deliveryMethod,
+      storeKey: '9267',
+      timestamp: new Date().toISOString()
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw new Error(error.response.data.message || 'Failed to create cart with pizza');
+    }
+    throw new Error('Failed to create cart with pizza');
+  }
+};
+
+/**
+ * Adds a configured pizza to existing cart
+ * @param cartId - The cart ID
+ * @param cartVersion - The cart version
+ * @param configuration - The pizza configuration
+ * @returns Promise resolving to the updated cart
+ */
+export const addPizzaToCartAdvanced = async (
+  cartId: string,
+  cartVersion: number,
+  configuration: PizzaConfiguration
+): Promise<Cart> => {
+  try {
+    const response = await axios.post<Cart>(`${API_BASE}/carts/${cartId}/pizza`, {
+      version: cartVersion,
+      configuration,
+      timestamp: new Date().toISOString()
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      throw new Error(error.response.data.message || 'Failed to add pizza to cart');
+    }
+    throw new Error('Failed to add pizza to cart');
+  }
+}; 

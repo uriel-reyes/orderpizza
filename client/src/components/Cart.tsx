@@ -216,27 +216,6 @@ const Cart: React.FC<CartProps> = ({
 
   return (
     <>
-      {/* Cart icon with badge */}
-      <Badge badgeContent={getTotalItems()} color="secondary">
-        <IconButton 
-          color="inherit" 
-          onClick={onClose} 
-          sx={{ 
-            position: 'fixed', 
-            right: 16, 
-            bottom: 16, 
-            bgcolor: 'primary.main', 
-            color: 'white',
-            '&:hover': {
-              bgcolor: 'primary.dark',
-            },
-            zIndex: 1200
-          }}
-        >
-          <ShoppingCartIcon />
-        </IconButton>
-      </Badge>
-      
       {/* Cart drawer */}
       <Drawer 
         anchor="right" 

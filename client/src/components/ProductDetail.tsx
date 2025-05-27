@@ -306,12 +306,43 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
       }
       
       console.log("Creating order from cart:", orderCart.id, orderCart.version);
-      // Create order from cart, passing the delivery method
-      const order = await createOrder(
-        orderCart.id,
-        orderCart.version,
-        method
-      );
+      
+      // Try to create order, handle version mismatch
+      let order;
+      try {
+        order = await createOrder(
+          orderCart.id,
+          orderCart.version,
+          method
+        );
+      } catch (err) {
+        // Check if it's a version mismatch error
+        if (err instanceof Error && err.message.includes('different version than expected')) {
+          console.log("Version mismatch detected, fetching latest cart...");
+          // Extract the actual version from the error message
+          const versionMatch = err.message.match(/Actual: (\d+)/);
+          if (versionMatch) {
+            const actualVersion = parseInt(versionMatch[1]);
+            console.log(`Retrying with actual version: ${actualVersion}`);
+            
+            // Update the cart version in our local state
+            const updatedCart = { ...orderCart, version: actualVersion };
+            setCart(updatedCart);
+            
+            // Retry the order creation with the correct version
+            order = await createOrder(
+              orderCart.id,
+              actualVersion,
+              method
+            );
+          } else {
+            throw err; // Re-throw if we can't parse the version
+          }
+        } else {
+          throw err; // Re-throw if it's not a version mismatch
+        }
+      }
+      
       console.log("Order created:", order);
       
       // Save order details for confirmation screen

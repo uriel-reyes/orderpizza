@@ -18,9 +18,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.productByIdQuery = void 0;
-exports.getAccessToken = getAccessToken;
-exports.fetchProductById = fetchProductById;
+exports.fetchProductById = exports.getAccessToken = exports.productByIdQuery = void 0;
 const node_fetch_1 = __importDefault(require("node-fetch"));
 const graphql_tag_1 = __importDefault(require("graphql-tag"));
 require("dotenv/config");
@@ -209,6 +207,7 @@ function getAccessToken() {
         return data.access_token;
     });
 }
+exports.getAccessToken = getAccessToken;
 /**
  * Executes a GraphQL query to fetch product data by ID
  *
@@ -258,3 +257,4 @@ function fetchProductById(productId) {
         }
     });
 }
+exports.fetchProductById = fetchProductById;

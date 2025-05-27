@@ -25,6 +25,201 @@ app.use((req, res, next) => {
 });
 
 // API routes
+
+// Get channels/stores information
+app.get('/api/channels', async (req, res) => {
+  try {
+    console.log('Fetching channels from CommerceTools...');
+    
+    const response = await apiRoot
+      .channels()
+      .get()
+      .execute();
+    
+    // Transform channels data
+    const channels = response.body.results.map(channel => ({
+      id: channel.id,
+      key: channel.key,
+      name: channel.name?.['en-US'] || channel.key,
+      roles: channel.roles
+    }));
+    
+    console.log(`Found ${channels.length} channels`);
+    res.json(channels);
+  } catch (error) {
+    console.error('Error fetching channels:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to fetch channels',
+      statusCode: 500
+    });
+  }
+});
+
+// Get pizza bases (must come before the generic :id route)
+app.get('/api/products/pizza-bases', async (req, res) => {
+  try {
+    const { channel } = req.query; // Optional channel ID for pricing
+    console.log(`Fetching pizza bases from CommerceTools${channel ? ` for channel: ${channel}` : ''}...`);
+    
+    // First, get the product type ID for pizza-base
+    const productTypeResponse = await apiRoot
+      .productTypes()
+      .get({
+        queryArgs: {
+          where: 'name="Pizza"'
+        }
+      })
+      .execute();
+    
+    if (productTypeResponse.body.results.length === 0) {
+      throw new Error('Pizza product type not found');
+    }
+    
+    const pizzaBaseTypeId = productTypeResponse.body.results[0].id;
+    
+    // Fetch pizza base products from CommerceTools
+    const response = await apiRoot
+      .products()
+      .get({
+        queryArgs: {
+          where: `productType(id="${pizzaBaseTypeId}")`,
+          expand: ['masterVariant', 'variants']
+        }
+      })
+      .execute();
+    
+    // Transform CommerceTools data to match our expected format
+    const pizzaBases = response.body.results.map(product => {
+      // Get all variants (master + variants)
+      const allVariants = [product.masterData.current.masterVariant, ...product.masterData.current.variants];
+      
+      // Get available crusts from the first variant's attributes
+      const availableCrustsAttr = product.masterData.current.masterVariant.attributes?.find(attr => attr.name === 'availableCrusts');
+      const availableCrusts = availableCrustsAttr?.value || [];
+      
+      // Helper function to get price for a specific channel (defaults to first available US price)
+      const getPriceForChannel = (variant, channelId = null) => {
+        const usPrices = variant.prices?.filter(price => price.country === 'US') || [];
+        
+        if (channelId) {
+          // Find price for specific channel
+          const channelPrice = usPrices.find(price => price.channel?.id === channelId);
+          if (channelPrice) return channelPrice.value;
+        }
+        
+        // Default to first US price if no channel specified or channel not found
+        return usPrices.length > 0 ? usPrices[0].value : { centAmount: 0, currencyCode: 'USD' };
+      };
+      
+      return {
+        id: product.id,
+        key: product.key,
+        name: product.masterData.current.name['en-US'],
+        description: product.masterData.current.description?.['en-US'] || '',
+        availableCrusts: availableCrusts,
+        variants: allVariants.map(variant => {
+          const crustTypeAttr = variant.attributes?.find(attr => attr.name === 'crustType');
+          
+          // Get all US prices with channel info
+          const usPrices = variant.prices?.filter(price => price.country === 'US') || [];
+          const pricesByChannel = {};
+          usPrices.forEach(price => {
+            if (price.channel?.id) {
+              pricesByChannel[price.channel.id] = price.value;
+            }
+          });
+          
+          return {
+            id: variant.id,
+            key: variant.key,
+            sku: variant.sku,
+            crustType: crustTypeAttr?.value || '',
+            price: getPriceForChannel(variant, channel), // Use channel parameter if provided
+            pricesByChannel: pricesByChannel, // All channel-specific prices
+            allPrices: usPrices // Keep all US prices for reference
+          };
+        })
+      };
+    });
+    
+    console.log(`Found ${pizzaBases.length} pizza bases`);
+    res.json(pizzaBases);
+  } catch (error) {
+    console.error('Error fetching pizza bases:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to fetch pizza bases',
+      statusCode: 500
+    });
+  }
+});
+
+// Get ingredients by category (must come before the generic :id route)
+app.get('/api/products/ingredients', async (req, res) => {
+  try {
+    const { category } = req.query;
+    console.log(`Fetching ingredients from CommerceTools for category: ${category || 'all'}`);
+    
+    // First, get the product type ID for ingredient
+    const productTypeResponse = await apiRoot
+      .productTypes()
+      .get({
+        queryArgs: {
+          where: 'name="Ingredient"'
+        }
+      })
+      .execute();
+    
+    if (productTypeResponse.body.results.length === 0) {
+      throw new Error('Ingredient product type not found');
+    }
+    
+    const ingredientTypeId = productTypeResponse.body.results[0].id;
+    
+    // Build the where clause
+    let whereClause = `productType(id="${ingredientTypeId}")`;
+    if (category) {
+      whereClause += ` and masterData(current(masterVariant(attributes(name="category" and value(key="${category}")))))`;
+    }
+    
+    // Fetch ingredient products from CommerceTools
+    const response = await apiRoot
+      .products()
+      .get({
+        queryArgs: {
+          where: whereClause,
+          expand: ['masterVariant']
+        }
+      })
+      .execute();
+    
+    // Transform CommerceTools data to match our expected format
+    const ingredients = response.body.results.map(product => {
+      const masterVariant = product.masterData.current.masterVariant;
+      const categoryAttr = masterVariant.attributes?.find(attr => attr.name === 'category');
+      const isHalfPizzaConfigurableAttr = masterVariant.attributes?.find(attr => attr.name === 'isHalfPizzaConfigurable');
+      
+      return {
+        id: product.id,
+        key: product.key,
+        name: product.masterData.current.name['en-US'],
+        category: categoryAttr?.value?.key || '',
+        isHalfPizzaConfigurable: isHalfPizzaConfigurableAttr?.value || false,
+        sku: masterVariant.sku
+      };
+    });
+    
+    console.log(`Found ${ingredients.length} ingredients for category: ${category || 'all'}`);
+    res.json(ingredients);
+  } catch (error) {
+    console.error('Error fetching ingredients:', error);
+    res.status(500).json({ 
+      message: error.message || 'Failed to fetch ingredients',
+      statusCode: 500
+    });
+  }
+});
+
+// Generic product by ID route (must come after specific routes)
 app.get('/api/products/:id', async (req, res) => {
   try {
     const productId = req.params.id;

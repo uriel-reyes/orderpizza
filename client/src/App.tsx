@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Container, 
   Typography, 
   Box, 
   AppBar, 
@@ -8,10 +7,13 @@ import {
   CssBaseline,
   Button,
   Badge,
+  Select,
+  MenuItem,
+  FormControl
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { fetchProductById, DEFAULT_PRODUCT_ID, Product, Cart as CartType } from './api/commercetools';
-import ProductDetail from './components/ProductDetail';
+import { Cart as CartType, fetchChannels, Channel } from './api/commercetools';
+import PizzaBuilderPage from './components/PizzaBuilderPage';
 import LocalPizzaIcon from '@mui/icons-material/LocalPizza';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 
@@ -45,35 +47,29 @@ const theme = createTheme({
 });
 
 function App() {
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [productId] = useState<string>(DEFAULT_PRODUCT_ID);
   const [cart, setCart] = useState<CartType | null>(null);
   const [cartOpen, setCartOpen] = useState<boolean>(false);
-
-  // Fetch product data on component mount
-  useEffect(() => {
-    async function loadProduct() {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const data = await fetchProductById(productId);
-        setProduct(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        setProduct(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    loadProduct();
-  }, [productId]);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [selectedStoreKey, setSelectedStoreKey] = useState<string>('9267');
 
   const toggleCart = () => {
     setCartOpen(!cartOpen);
+  };
+
+  // Get total items count
+  const getTotalItems = () => {
+    if (!cart || !cart.lineItems) return 0;
+    return cart.lineItems.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  // Load channels on mount
+  useEffect(() => {
+    fetchChannels().then(setChannels).catch(console.error);
+  }, []);
+
+  // Get selected channel ID from store key
+  const getSelectedChannelId = () => {
+    return channels.find(c => c.key === selectedStoreKey)?.id || '';
   };
 
   return (
@@ -86,11 +82,35 @@ function App() {
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
               Build Your Pizza
             </Typography>
+            
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Typography variant="subtitle2" sx={{ mr: 2 }}>
-                Store: #9267
+              <Typography variant="subtitle2" sx={{ mr: 1 }}>
+                Store: #
               </Typography>
-              <Badge badgeContent={cart?.lineItems?.length || 0} color="secondary">
+              <FormControl variant="outlined" size="small" sx={{ mr: 2, minWidth: 80 }}>
+                <Select
+                  value={selectedStoreKey}
+                  onChange={(e) => {
+                    setSelectedStoreKey(e.target.value);
+                  }}
+                  sx={{ 
+                    color: 'white',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(255, 255, 255, 0.23)',
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgba(255, 255, 255, 0.5)',
+                    },
+                    '& .MuiSvgIcon-root': {
+                      color: 'white',
+                    }
+                  }}
+                >
+                  <MenuItem value="9267">9267</MenuItem>
+                  <MenuItem value="8783">8783</MenuItem>
+                </Select>
+              </FormControl>
+              <Badge badgeContent={getTotalItems()} color="secondary">
                 <Button 
                   variant="contained" 
                   color="secondary" 
@@ -105,18 +125,13 @@ function App() {
           </Toolbar>
         </AppBar>
         
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
-          {/* Product Detail Component */}
-          <ProductDetail 
-            product={product as Product}
-            loading={loading}
-            error={error}
-            cart={cart}
-            setCart={setCart}
-            cartOpen={cartOpen}
-            setCartOpen={setCartOpen}
-          />
-        </Container>
+        <PizzaBuilderPage
+          cart={cart}
+          setCart={setCart}
+          cartOpen={cartOpen}
+          setCartOpen={setCartOpen}
+          selectedChannelId={getSelectedChannelId()}
+        />
       </Box>
     </ThemeProvider>
   );
