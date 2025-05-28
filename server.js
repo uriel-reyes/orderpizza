@@ -26,6 +26,20 @@ app.use((req, res, next) => {
 
 // API routes
 
+// Helper function to get price for a specific channel (defaults to first available US price)
+const getPriceForChannel = (variant, channelId = null) => {
+  const usPrices = variant.prices?.filter(price => price.country === 'US') || [];
+  
+  if (channelId) {
+    // Find price for specific channel
+    const channelPrice = usPrices.find(price => price.channel?.id === channelId);
+    if (channelPrice) return channelPrice.value;
+  }
+  
+  // Default to first US price if no channel specified or channel not found
+  return usPrices.length > 0 ? usPrices[0].value : { centAmount: 0, currencyCode: 'USD' };
+};
+
 // Get channels/stores information
 app.get('/api/channels', async (req, res) => {
   try {
@@ -61,28 +75,29 @@ app.get('/api/products/pizza-bases', async (req, res) => {
     const { channel } = req.query; // Optional channel ID for pricing
     console.log(`Fetching pizza bases from CommerceTools${channel ? ` for channel: ${channel}` : ''}...`);
     
-    // First, get the product type ID for pizza-base
-    const productTypeResponse = await apiRoot
-      .productTypes()
+    // Use category approach for pizza bases (UPDATED)
+    // First, get the category ID for pizza
+    const categoryResponse = await apiRoot
+      .categories()
       .get({
         queryArgs: {
-          where: 'name="Pizza"'
+          where: 'key="pizza"'
         }
       })
       .execute();
     
-    if (productTypeResponse.body.results.length === 0) {
-      throw new Error('Pizza product type not found');
+    if (categoryResponse.body.results.length === 0) {
+      throw new Error('Pizza category not found');
     }
     
-    const pizzaBaseTypeId = productTypeResponse.body.results[0].id;
+    const pizzaCategoryId = categoryResponse.body.results[0].id;
     
-    // Fetch pizza base products from CommerceTools
+    // Fetch pizza base products from CommerceTools using category
     const response = await apiRoot
       .products()
       .get({
         queryArgs: {
-          where: `productType(id="${pizzaBaseTypeId}")`,
+          where: `masterData(current(categories(id="${pizzaCategoryId}")))`,
           expand: ['masterVariant', 'variants']
         }
       })
@@ -96,20 +111,6 @@ app.get('/api/products/pizza-bases', async (req, res) => {
       // Get available crusts from the first variant's attributes
       const availableCrustsAttr = product.masterData.current.masterVariant.attributes?.find(attr => attr.name === 'availableCrusts');
       const availableCrusts = availableCrustsAttr?.value || [];
-      
-      // Helper function to get price for a specific channel (defaults to first available US price)
-      const getPriceForChannel = (variant, channelId = null) => {
-        const usPrices = variant.prices?.filter(price => price.country === 'US') || [];
-        
-        if (channelId) {
-          // Find price for specific channel
-          const channelPrice = usPrices.find(price => price.channel?.id === channelId);
-          if (channelPrice) return channelPrice.value;
-        }
-        
-        // Default to first US price if no channel specified or channel not found
-        return usPrices.length > 0 ? usPrices[0].value : { centAmount: 0, currencyCode: 'USD' };
-      };
       
       return {
         id: product.id,
@@ -159,34 +160,46 @@ app.get('/api/products/ingredients', async (req, res) => {
     const { category } = req.query;
     console.log(`Fetching ingredients from CommerceTools for category: ${category || 'all'}`);
     
-    // First, get the product type ID for ingredient
-    const productTypeResponse = await apiRoot
-      .productTypes()
+    if (!category) {
+      return res.status(400).json({ 
+        message: 'Category parameter is required',
+        statusCode: 400
+      });
+    }
+
+    // Map category names to match your category keys
+    const categoryMapping = {
+      'meat': 'meats',
+      'vegetable': 'vegetables',
+      'cheese': 'cheese',  // Now using category approach for cheese too
+      'sauce': 'sauce'
+    };
+    
+    const categoryKey = categoryMapping[category] || category;
+    console.log(`Using category approach for ${category}, mapped to key "${categoryKey}"`);
+    
+    // First, get the category ID
+    const categoryResponse = await apiRoot
+      .categories()
       .get({
         queryArgs: {
-          where: 'name="Ingredient"'
+          where: `key="${categoryKey}"`
         }
       })
       .execute();
     
-    if (productTypeResponse.body.results.length === 0) {
-      throw new Error('Ingredient product type not found');
+    if (categoryResponse.body.results.length === 0) {
+      throw new Error(`Category "${categoryKey}" not found`);
     }
     
-    const ingredientTypeId = productTypeResponse.body.results[0].id;
+    const categoryId = categoryResponse.body.results[0].id;
     
-    // Build the where clause
-    let whereClause = `productType(id="${ingredientTypeId}")`;
-    if (category) {
-      whereClause += ` and masterData(current(masterVariant(attributes(name="category" and value(key="${category}")))))`;
-    }
-    
-    // Fetch ingredient products from CommerceTools
+    // Fetch ingredient products from CommerceTools using category
     const response = await apiRoot
       .products()
       .get({
         queryArgs: {
-          where: whereClause,
+          where: `masterData(current(categories(id="${categoryId}")))`,
           expand: ['masterVariant']
         }
       })
@@ -195,20 +208,47 @@ app.get('/api/products/ingredients', async (req, res) => {
     // Transform CommerceTools data to match our expected format
     const ingredients = response.body.results.map(product => {
       const masterVariant = product.masterData.current.masterVariant;
-      const categoryAttr = masterVariant.attributes?.find(attr => attr.name === 'category');
       const isHalfPizzaConfigurableAttr = masterVariant.attributes?.find(attr => attr.name === 'isHalfPizzaConfigurable');
+      
+      // Get all variants with pricing
+      const variants = product.masterData.current.variants || [];
+      const allVariants = [masterVariant, ...variants];
+      
+      // Process variants with pricing
+      const variantsWithPricing = allVariants.map(variant => {
+        // Filter prices for US only
+        const usPrices = variant.prices?.filter(price => price.country === 'US') || [];
+        
+        // Get price for specific channel or default
+        const priceForChannel = getPriceForChannel(variant, req.query.channel);
+        
+        // Get size and coverage attributes
+        const sizeAttr = variant.attributes?.find(attr => attr.name === 'pizza-size');
+        const coverageAttr = variant.attributes?.find(attr => attr.name === 'coverage');
+        
+        return {
+          id: variant.id,
+          key: variant.key,
+          sku: variant.sku,
+          size: sizeAttr?.value || null,
+          coverage: coverageAttr?.value || null,
+          price: priceForChannel,
+          allPrices: usPrices
+        };
+      });
       
       return {
         id: product.id,
         key: product.key,
         name: product.masterData.current.name['en-US'],
-        category: categoryAttr?.value?.key || '',
+        category: category, // Use the original category parameter for consistency
         isHalfPizzaConfigurable: isHalfPizzaConfigurableAttr?.value || false,
-        sku: masterVariant.sku
+        sku: masterVariant.sku,
+        variants: variantsWithPricing
       };
     });
     
-    console.log(`Found ${ingredients.length} ingredients for category: ${category || 'all'}`);
+    console.log(`Found ${ingredients.length} ingredients for category: ${category}`);
     res.json(ingredients);
   } catch (error) {
     console.error('Error fetching ingredients:', error);

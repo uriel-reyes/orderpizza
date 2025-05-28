@@ -52,7 +52,7 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Selection state
-  const [selectedSize, setSelectedSize] = useState<string>('14');
+  const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedCrust, setSelectedCrust] = useState<string>('');
   const [selectedBase, setSelectedBase] = useState<PizzaBaseProduct | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<PizzaBaseProduct['variants'][0] | null>(null);
@@ -78,10 +78,10 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
         // Load all data in parallel
         const [basesData, saucesData, cheesesData, meatsData, vegetablesData] = await Promise.all([
           fetchPizzaBases(selectedChannelId),
-          fetchIngredients('sauce'),
-          fetchIngredients('cheese'),
-          fetchIngredients('meat'),
-          fetchIngredients('vegetable')
+          fetchIngredients('sauce', selectedChannelId),
+          fetchIngredients('cheese', selectedChannelId),
+          fetchIngredients('meat', selectedChannelId),
+          fetchIngredients('vegetable', selectedChannelId)
         ]);
         
         setPizzaBases(basesData);
@@ -90,40 +90,21 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
         setMeats(meatsData);
         setVegetables(vegetablesData);
         
-        // Set default selections
-        if (basesData.length > 0) {
-          const defaultBase = basesData.find(base => base.key === 'pizza-12-inch') || basesData[0];
-          setSelectedBase(defaultBase);
-          setSelectedSize('12');
-          
-          if (defaultBase.variants.length > 0) {
-            const defaultVariant = defaultBase.variants[0];
-            setSelectedVariant(defaultVariant);
-            
-            // Initialize configuration
-            const initialConfig: PizzaConfiguration = {
-              baseProductId: defaultBase.id,
-              variantId: defaultVariant.id,
-              size: '12',
-              crustType: defaultVariant.crustType,
-              sauce: { 
-                productId: saucesData.find(s => s.key === 'robust-tomato-sauce')?.id || saucesData[0]?.id || '', 
-                amount: 'normal' 
-              },
-              cheese: {
-                whole: { 
-                  productId: cheesesData.find(c => c.key === 'mozzarella-cheese')?.id || cheesesData[0]?.id || '', 
-                  amount: 'normal' 
-                }
-              },
-              toppings: {}
-            };
-            
-            setConfiguration(initialConfig);
-            onConfigurationChange(initialConfig);
-            onPriceChange(defaultVariant.price.centAmount);
-          }
-        }
+        // Don't set any default selections - let user choose
+        // Initialize empty configuration
+        const initialConfig: PizzaConfiguration = {
+          baseProductId: '',
+          variantId: 0,
+          size: '',
+          crustType: '',
+          sauce: { productId: '', amount: 'normal' },
+          cheese: {},
+          toppings: {}
+        };
+        
+        setConfiguration(initialConfig);
+        onConfigurationChange(initialConfig);
+        onPriceChange(0); // Start with 0 price
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load pizza data');
       } finally {
@@ -139,8 +120,19 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     if (selectedChannelId && selectedBase && selectedCrust) {
       const reloadPizzaBases = async () => {
         try {
-          const basesData = await fetchPizzaBases(selectedChannelId);
+          const [basesData, saucesData, cheesesData, meatsData, vegetablesData] = await Promise.all([
+            fetchPizzaBases(selectedChannelId),
+            fetchIngredients('sauce', selectedChannelId),
+            fetchIngredients('cheese', selectedChannelId),
+            fetchIngredients('meat', selectedChannelId),
+            fetchIngredients('vegetable', selectedChannelId)
+          ]);
+          
           setPizzaBases(basesData);
+          setSauces(saucesData);
+          setCheeses(cheesesData);
+          setMeats(meatsData);
+          setVegetables(vegetablesData);
           
           // Find the updated base with new pricing
           const updatedBase = basesData.find(base => base.id === selectedBase.id);
@@ -160,9 +152,6 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
               };
               setConfiguration(updatedConfig);
               onConfigurationChange(updatedConfig);
-              
-              // Update price
-              onPriceChange(updatedVariant.price.centAmount);
             }
           }
         } catch (err) {
@@ -173,12 +162,11 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     }
   }, [selectedChannelId]);
 
-  // Update price when selected variant changes
+  // Update total price when configuration changes
   useEffect(() => {
-    if (selectedVariant) {
-      onPriceChange(selectedVariant.price.centAmount);
-    }
-  }, [selectedVariant, onPriceChange]);
+    const totalPrice = calculateTotalPrice();
+    onPriceChange(totalPrice);
+  }, [configuration, selectedVariant, sauces, cheeses, meats, vegetables, selectedSize]);
 
   // Helper functions
   const getAvailableSizes = () => {
@@ -201,6 +189,124 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     return selectedBase.variants.find(v => v.crustType === selectedCrust);
   };
 
+  // Price calculation helpers
+  const getIngredientPrice = (ingredient: IngredientProduct, amount: string, coverage: string = 'whole') => {
+    if (!selectedSize) return 0;
+    
+    // Map UI size to CommerceTools Size attribute value
+    const sizeMap: { [key: string]: string } = {
+      '10': '10" Small',
+      '12': '12" Medium', 
+      '14': '14" Large',
+      '16': '16" XL'
+    };
+    
+    // Map UI coverage to CommerceTools Coverage attribute value
+    const coverageMap: { [key: string]: string } = {
+      'whole': 'Whole Pizza',
+      'left': 'Half Pizza',
+      'right': 'Half Pizza'
+    };
+    
+    const commerceToolsSize = sizeMap[selectedSize];
+    const commerceToolsCoverage = coverageMap[coverage];
+    
+    if (!commerceToolsSize || !commerceToolsCoverage) {
+      console.warn(`Unable to map size "${selectedSize}" or coverage "${coverage}" to CommerceTools values`);
+      return 0;
+    }
+    
+    console.log(`Looking for ${ingredient.name} variant with size="${commerceToolsSize}" and coverage="${commerceToolsCoverage}"`);
+    console.log(`Available variants for ${ingredient.name}:`, ingredient.variants.map(v => ({ 
+      id: v.id, 
+      size: v.size, 
+      coverage: v.coverage, 
+      price: v.price.centAmount 
+    })));
+    
+    // Find the variant that matches the current pizza size and coverage
+    // Note: CommerceTools returns objects with key/label properties, so we need to check the label
+    const variant = ingredient.variants.find(v => {
+      const variantSize = typeof v.size === 'object' && v.size ? v.size.label : v.size;
+      const variantCoverage = typeof v.coverage === 'object' && v.coverage ? v.coverage.label : v.coverage;
+      
+      return variantSize === commerceToolsSize && variantCoverage === commerceToolsCoverage;
+    });
+    
+    if (!variant) {
+      console.warn(`No variant found for ingredient ${ingredient.name} with size "${commerceToolsSize}" and coverage "${commerceToolsCoverage}"`);
+      console.warn('Available size/coverage combinations:', ingredient.variants.map(v => ({
+        size: typeof v.size === 'object' && v.size ? v.size.label : v.size,
+        coverage: typeof v.coverage === 'object' && v.coverage ? v.coverage.label : v.coverage,
+        price: v.price.centAmount
+      })));
+      return 0;
+    }
+    
+    console.log(`Found matching variant for ${ingredient.name}:`, { 
+      id: variant.id, 
+      size: typeof variant.size === 'object' && variant.size ? variant.size.label : variant.size,
+      coverage: typeof variant.coverage === 'object' && variant.coverage ? variant.coverage.label : variant.coverage,
+      price: variant.price.centAmount 
+    });
+    
+    // Return the base price without amount multipliers since they're not modeled in CommerceTools
+    return variant.price.centAmount;
+  };
+
+  const calculateTotalPrice = () => {
+    let total = 0;
+    
+    console.log('=== Calculating Total Price ===');
+    
+    // Base pizza price
+    if (selectedVariant) {
+      total += selectedVariant.price.centAmount;
+      console.log(`Base pizza: $${(selectedVariant.price.centAmount / 100).toFixed(2)}`);
+    } else {
+      console.log('No base pizza selected');
+    }
+    
+    // Sauce price (if selected and not default)
+    if (configuration.sauce.productId) {
+      const sauce = sauces.find(s => s.id === configuration.sauce.productId);
+      if (sauce) {
+        const saucePrice = getIngredientPrice(sauce, configuration.sauce.amount, 'whole');
+        total += saucePrice;
+        console.log(`Sauce (${sauce.name}): $${(saucePrice / 100).toFixed(2)}`);
+      }
+    }
+    
+    // Cheese price
+    Object.entries(configuration.cheese).forEach(([side, cheeseConfig]) => {
+      if (cheeseConfig?.productId) {
+        const cheese = cheeses.find(c => c.id === cheeseConfig.productId);
+        if (cheese) {
+          const cheesePrice = getIngredientPrice(cheese, cheeseConfig.amount, side as 'whole' | 'left' | 'right');
+          total += cheesePrice;
+          console.log(`Cheese (${cheese.name}, ${side}): $${(cheesePrice / 100).toFixed(2)}`);
+        }
+      }
+    });
+    
+    // Toppings price
+    Object.entries(configuration.toppings).forEach(([side, toppings]) => {
+      toppings?.forEach(topping => {
+        const ingredient = [...meats, ...vegetables].find(ing => ing.id === topping.productId);
+        if (ingredient) {
+          const toppingPrice = getIngredientPrice(ingredient, topping.amount, side as 'whole' | 'left' | 'right');
+          total += toppingPrice;
+          console.log(`Topping (${ingredient.name}, ${side}): $${(toppingPrice / 100).toFixed(2)}`);
+        }
+      });
+    });
+    
+    console.log(`Total: $${(total / 100).toFixed(2)}`);
+    console.log('=== End Price Calculation ===');
+    
+    return total;
+  };
+
   // Handle size change
   const handleSizeChange = (size: string) => {
     setSelectedSize(size);
@@ -212,13 +318,17 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     setSelectedCrust('');
     setSelectedVariant(null);
     
-    // Set default crust if available
-    if (base && base.availableCrusts.length > 0) {
-      const defaultCrust = base.availableCrusts[0];
-      setSelectedCrust(defaultCrust);
-      const variant = base.variants.find(v => v.crustType === defaultCrust);
-      setSelectedVariant(variant || null);
-    }
+    // Update configuration with new size but no variant yet
+    const newConfig = {
+      ...configuration,
+      size,
+      baseProductId: base?.id || '',
+      variantId: 0,
+      crustType: ''
+    };
+    setConfiguration(newConfig);
+    onConfigurationChange(newConfig);
+    onPriceChange(0); // Reset price until crust is selected
   };
 
   const handleCrustChange = (crust: string) => {
@@ -226,6 +336,19 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     if (selectedBase) {
       const variant = selectedBase.variants.find(v => v.crustType === crust);
       setSelectedVariant(variant || null);
+      
+      // Update configuration with complete selection
+      if (variant) {
+        const newConfig = {
+          ...configuration,
+          baseProductId: selectedBase.id,
+          variantId: variant.id,
+          crustType: crust
+        };
+        setConfiguration(newConfig);
+        onConfigurationChange(newConfig);
+        onPriceChange(variant.price.centAmount);
+      }
     }
   };
 
@@ -303,11 +426,46 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     return toppings.some(t => t.productId === productId);
   };
 
+  // Check if topping is selected on any side
+  const isToppingSelectedAnywhere = (productId: string) => {
+    return isToppingSelected(productId, 'whole') || 
+           isToppingSelected(productId, 'left') || 
+           isToppingSelected(productId, 'right');
+  };
+
+  // Get which side a topping is selected on
+  const getToppingSide = (productId: string): 'whole' | 'left' | 'right' => {
+    if (isToppingSelected(productId, 'left')) return 'left';
+    if (isToppingSelected(productId, 'right')) return 'right';
+    return 'whole'; // default
+  };
+
   // Get topping amount
   const getToppingAmount = (productId: string, side: 'whole' | 'left' | 'right' = 'whole') => {
     const toppings = configuration.toppings[side] || [];
     const topping = toppings.find(t => t.productId === productId);
     return topping?.amount || 'normal';
+  };
+
+  // Handle topping side change
+  const handleToppingSideChange = (productId: string, newSide: 'whole' | 'left' | 'right') => {
+    // First, remove the topping from all sides
+    const newConfig = {
+      ...configuration,
+      toppings: {
+        whole: (configuration.toppings.whole || []).filter(t => t.productId !== productId),
+        left: (configuration.toppings.left || []).filter(t => t.productId !== productId),
+        right: (configuration.toppings.right || []).filter(t => t.productId !== productId)
+      }
+    };
+
+    // Then add it to the new side with the current amount
+    const currentAmount = getToppingAmount(productId, getToppingSide(productId));
+    const currentToppings = newConfig.toppings[newSide] || [];
+    newConfig.toppings[newSide] = [...currentToppings, { productId, amount: currentAmount }];
+
+    setConfiguration(newConfig);
+    onConfigurationChange(newConfig);
   };
 
   if (loading) {
@@ -366,12 +524,77 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
             
             {/* Price Display */}
             <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="h5" color="success.main" fontWeight="bold">
-                ${selectedVariant?.price ? (selectedVariant.price.centAmount / 100).toFixed(2) : '0.00'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {selectedSize}" {selectedVariant?.crustType} Pizza
-              </Typography>
+              {selectedVariant ? (
+                <>
+                  <Typography variant="h5" color="success.main" fontWeight="bold">
+                    ${(calculateTotalPrice() / 100).toFixed(2)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    {selectedSize}" {formatCrustName(selectedVariant.crustType)} Pizza
+                  </Typography>
+                  
+                  {/* Price Breakdown */}
+                  <Box sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Base: ${(selectedVariant.price.centAmount / 100).toFixed(2)}
+                    </Typography>
+                    
+                    {/* Show sauce cost if selected */}
+                    {configuration.sauce.productId && (() => {
+                      const sauce = sauces.find(s => s.id === configuration.sauce.productId);
+                      const saucePrice = sauce ? getIngredientPrice(sauce, configuration.sauce.amount, 'whole') : 0;
+                      if (saucePrice > 0) {
+                        return (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Sauce: +${(saucePrice / 100).toFixed(2)}
+                          </Typography>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Show cheese cost if selected */}
+                    {Object.entries(configuration.cheese).map(([side, cheeseConfig]) => {
+                      if (!cheeseConfig?.productId) return null;
+                      const cheese = cheeses.find(c => c.id === cheeseConfig.productId);
+                      const cheesePrice = cheese ? getIngredientPrice(cheese, cheeseConfig.amount, side as any) : 0;
+                      if (cheesePrice > 0) {
+                        return (
+                          <Typography key={side} variant="caption" color="text.secondary" display="block">
+                            Cheese: +${(cheesePrice / 100).toFixed(2)}
+                          </Typography>
+                        );
+                      }
+                      return null;
+                    })}
+                    
+                    {/* Show toppings cost */}
+                    {Object.entries(configuration.toppings).map(([side, toppings]) => 
+                      toppings?.map(topping => {
+                        const ingredient = [...meats, ...vegetables].find(ing => ing.id === topping.productId);
+                        const toppingPrice = ingredient ? getIngredientPrice(ingredient, topping.amount, side as any) : 0;
+                        if (toppingPrice > 0) {
+                          return (
+                            <Typography key={`${side}-${topping.productId}`} variant="caption" color="text.secondary" display="block">
+                              {ingredient?.name}: +${(toppingPrice / 100).toFixed(2)}
+                            </Typography>
+                          );
+                        }
+                        return null;
+                      })
+                    )}
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <Typography variant="h5" color="text.secondary" fontWeight="bold">
+                    Select Size and Crust
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Choose your pizza size and crust type to see pricing
+                  </Typography>
+                </>
+              )}
             </Box>
           </Paper>
         </Grid>
@@ -391,10 +614,19 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                   Choose Size
                 </Typography>
                 <ToggleButtonGroup
-                  value={selectedSize}
+                  value={selectedSize || false}
                   exclusive
                   onChange={(_, value) => value && handleSizeChange(value)}
                   aria-label="pizza size"
+                  size="large"
+                  sx={{ 
+                    '& .MuiToggleButton-root': { 
+                      px: 3, 
+                      py: 1.5, 
+                      fontSize: '1.1rem',
+                      minWidth: '60px'
+                    } 
+                  }}
                 >
                   {getAvailableSizes().map(size => (
                     <ToggleButton key={size} value={size}>
@@ -415,6 +647,15 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                     exclusive
                     onChange={(_, value) => value && handleCrustChange(value)}
                     aria-label="crust type"
+                    size="large"
+                    sx={{ 
+                      '& .MuiToggleButton-root': { 
+                        px: 3, 
+                        py: 1.5, 
+                        fontSize: '1rem',
+                        minWidth: '120px'
+                      } 
+                    }}
                   >
                     {getAvailableCrusts().map(crust => (
                       <ToggleButton key={crust} value={crust}>
@@ -538,10 +779,10 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                   {meats.map(meat => (
                     <Grid key={meat.id} sx={{ gridColumn: { xs: 'span 12', sm: 'span 6', md: 'span 4' } }}>
                       <Card 
-                        variant={isToppingSelected(meat.id) ? "outlined" : "elevation"}
+                        variant={isToppingSelectedAnywhere(meat.id) ? "outlined" : "elevation"}
                         sx={{ 
-                          border: isToppingSelected(meat.id) ? 2 : 1,
-                          borderColor: isToppingSelected(meat.id) ? 'primary.main' : 'divider'
+                          border: isToppingSelectedAnywhere(meat.id) ? 2 : 1,
+                          borderColor: isToppingSelectedAnywhere(meat.id) ? 'primary.main' : 'divider'
                         }}
                       >
                         <CardContent>
@@ -549,16 +790,16 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                             <Typography variant="subtitle2">{meat.name}</Typography>
                             <IconButton
                               size="small"
-                              onClick={() => isToppingSelected(meat.id) ? 
-                                handleToppingChange(meat.id, 'normal', 'whole', 'remove') :
+                              onClick={() => isToppingSelectedAnywhere(meat.id) ? 
+                                handleToppingChange(meat.id, 'normal', getToppingSide(meat.id), 'remove') :
                                 handleToppingChange(meat.id, 'normal', 'whole', 'add')
                               }
                             >
-                              {isToppingSelected(meat.id) ? <RemoveIcon /> : <AddIcon />}
+                              {isToppingSelectedAnywhere(meat.id) ? <RemoveIcon /> : <AddIcon />}
                             </IconButton>
                           </Box>
                           
-                          {isToppingSelected(meat.id) && (
+                          {isToppingSelectedAnywhere(meat.id) && (
                             <Box>
                               {/* Left/Whole/Right Selection */}
                               <Box sx={{ mb: 2 }}>
@@ -567,8 +808,9 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                                 </Typography>
                                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
                                   <ToggleButtonGroup
-                                    value="whole"
+                                    value={getToppingSide(meat.id)}
                                     exclusive
+                                    onChange={(_, value) => value && handleToppingSideChange(meat.id, value)}
                                     size="small"
                                     sx={{ '& .MuiToggleButton-root': { px: 1, minWidth: 40 } }}
                                   >
@@ -600,11 +842,11 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                                   Amount:
                                 </Typography>
                                 <ToggleButtonGroup
-                                  value={getToppingAmount(meat.id)}
+                                  value={getToppingAmount(meat.id, getToppingSide(meat.id))}
                                   exclusive
                                   onChange={(e, value) => {
                                     e.stopPropagation();
-                                    if (value) handleToppingChange(meat.id, value, 'whole', 'update');
+                                    if (value) handleToppingChange(meat.id, value, getToppingSide(meat.id), 'update');
                                   }}
                                   size="small"
                                 >
@@ -626,10 +868,10 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                   {vegetables.map(vegetable => (
                     <Grid key={vegetable.id} sx={{ gridColumn: { xs: 'span 12', sm: 'span 6', md: 'span 4' } }}>
                       <Card 
-                        variant={isToppingSelected(vegetable.id) ? "outlined" : "elevation"}
+                        variant={isToppingSelectedAnywhere(vegetable.id) ? "outlined" : "elevation"}
                         sx={{ 
-                          border: isToppingSelected(vegetable.id) ? 2 : 1,
-                          borderColor: isToppingSelected(vegetable.id) ? 'primary.main' : 'divider'
+                          border: isToppingSelectedAnywhere(vegetable.id) ? 2 : 1,
+                          borderColor: isToppingSelectedAnywhere(vegetable.id) ? 'primary.main' : 'divider'
                         }}
                       >
                         <CardContent>
@@ -637,16 +879,16 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                             <Typography variant="subtitle2">{vegetable.name}</Typography>
                             <IconButton
                               size="small"
-                              onClick={() => isToppingSelected(vegetable.id) ? 
-                                handleToppingChange(vegetable.id, 'normal', 'whole', 'remove') :
+                              onClick={() => isToppingSelectedAnywhere(vegetable.id) ? 
+                                handleToppingChange(vegetable.id, 'normal', getToppingSide(vegetable.id), 'remove') :
                                 handleToppingChange(vegetable.id, 'normal', 'whole', 'add')
                               }
                             >
-                              {isToppingSelected(vegetable.id) ? <RemoveIcon /> : <AddIcon />}
+                              {isToppingSelectedAnywhere(vegetable.id) ? <RemoveIcon /> : <AddIcon />}
                             </IconButton>
                           </Box>
                           
-                          {isToppingSelected(vegetable.id) && (
+                          {isToppingSelectedAnywhere(vegetable.id) && (
                             <Box>
                               {/* Left/Whole/Right Selection */}
                               <Box sx={{ mb: 2 }}>
@@ -655,8 +897,9 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                                 </Typography>
                                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
                                   <ToggleButtonGroup
-                                    value="whole"
+                                    value={getToppingSide(vegetable.id)}
                                     exclusive
+                                    onChange={(_, value) => value && handleToppingSideChange(vegetable.id, value)}
                                     size="small"
                                     sx={{ '& .MuiToggleButton-root': { px: 1, minWidth: 40 } }}
                                   >
@@ -688,11 +931,11 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                                   Amount:
                                 </Typography>
                                 <ToggleButtonGroup
-                                  value={getToppingAmount(vegetable.id)}
+                                  value={getToppingAmount(vegetable.id, getToppingSide(vegetable.id))}
                                   exclusive
                                   onChange={(e, value) => {
                                     e.stopPropagation();
-                                    if (value) handleToppingChange(vegetable.id, value, 'whole', 'update');
+                                    if (value) handleToppingChange(vegetable.id, value, getToppingSide(vegetable.id), 'update');
                                   }}
                                   size="small"
                                 >

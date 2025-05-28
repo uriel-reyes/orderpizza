@@ -462,6 +462,22 @@ export interface IngredientProduct {
   category: 'cheese' | 'meat' | 'vegetable' | 'sauce';
   isHalfPizzaConfigurable: boolean;
   sku: string;
+  variants: Array<{
+    id: number;
+    key: string;
+    sku: string;
+    size: { key: string; label: string } | string | null;
+    coverage: { key: string; label: string } | string | null;
+    price: {
+      centAmount: number;
+      currencyCode: string;
+    };
+    allPrices?: Array<{
+      value: { centAmount: number; currencyCode: string };
+      country: string;
+      channel?: { id: string };
+    }>;
+  }>;
 }
 
 /**
@@ -556,13 +572,19 @@ export const fetchPizzaBases = async (channelId?: string): Promise<PizzaBaseProd
 /**
  * Fetches all ingredient products by category
  * @param category - Optional category filter
+ * @param channelId - Optional channel ID for pricing
  * @returns Promise resolving to array of ingredient products
  */
-export const fetchIngredients = async (category?: string): Promise<IngredientProduct[]> => {
+export const fetchIngredients = async (category?: string, channelId?: string): Promise<IngredientProduct[]> => {
   try {
-    const url = category 
+    let url = category 
       ? `${API_BASE}/products/ingredients?category=${category}`
       : `${API_BASE}/products/ingredients`;
+    
+    // Add channel parameter if provided
+    if (channelId) {
+      url += category ? `&channel=${channelId}` : `?channel=${channelId}`;
+    }
     
     const response = await axios.get<IngredientProduct[]>(url);
     
