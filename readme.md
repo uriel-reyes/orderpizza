@@ -4,84 +4,128 @@
   </a>
 </p>
 
-# Pizza Ordering Application
+# 🍕 Pizza Ordering Application
 
-A modern, responsive pizza ordering application powered by CommerceTools API. This application allows customers to customize and order pizzas with advanced topping placement controls and real-time pricing across multiple store locations.
+A modern, responsive pizza ordering application powered by CommerceTools API. This application provides an intuitive pizza customization experience with advanced topping placement controls, real-time pricing across multiple store locations, and seamless integration with CommerceTools commerce platform.
 
-## Features
+## ✨ Features
 
-### Store Management
-- Multi-store support with channel-specific pricing
-- Store selection in header (Store #9267 and Store #8783)
-- Real-time price updates when switching between stores
-- Automatic US country filtering for pricing
+### 🏪 Multi-Store Management
+- **Store Selection**: Choose between Store #9267 and Store #8783 from the header
+- **Channel-Specific Pricing**: Real-time price updates when switching stores
+- **Geographic Pricing**: Automatic US country filtering for accurate regional pricing
+- **Store-Specific Inventory**: Each store maintains its own product availability and pricing
 
-### Pizza Customization
-- **Size Selection**: Choose from 12", 14", and 16" pizzas
-- **Crust Options**: Size-specific crust availability (Hand Tossed, Crunchy Thin, New York Style)
-- **Sauce Selection**: Multiple sauce options with Light/Normal/Extra amounts
-- **Cheese Selection**: Various cheese types with None/Light/Normal/Extra amounts
-- **Advanced Topping Placement**: 
-  - Left half, whole pizza, or right half placement for each topping
-  - Visual icons (◐ Left, ● Whole, ◑ Right) for intuitive selection
-  - Light/Normal/Extra amount control for each topping
-- **Real-time Pricing**: Instant price updates based on all selections and store location
+### 🍕 Advanced Pizza Customization
 
-### Visual Pizza Builder
-- Interactive pizza visualization showing selected toppings
-- Real-time updates as toppings are added or removed
-- Sticky visualization panel that follows while scrolling
-- Accurate representation of topping placement
+#### Size & Crust Selection
+- **Multiple Sizes**: 10" Small, 12" Medium, 14" Large, and 16" XL pizzas
+- **Dynamic Crust Options**: Size-specific crust availability
+  - Hand Tossed, Crunchy Thin, New York Style (varies by size)
+- **Smart Defaults**: No pre-selection - customers choose their preferences
 
-### Cart & Ordering
-- Add customized pizzas to cart with full configuration details
-- Cart badge showing total item count in header
-- Instant order capability with delivery method selection
-- Order confirmation with generated order numbers
-- Support for both pickup and delivery options
+#### Ingredient Customization
+- **Sauce Selection**: Multiple sauce varieties with Light/Normal/Extra amounts
+- **Cheese Options**: Various cheese types with None/Light/Normal/Extra amounts
+- **Premium Toppings**: Extensive meat and vegetable selections
 
-### Technical Architecture
-- **Frontend**: React with TypeScript and Material UI
-- **Backend**: Node.js with Express server
-- **API Integration**: Full CommerceTools API integration
+#### Revolutionary Half-Pizza Controls
+- **Intuitive Placement**: Choose Left half (◐), Whole pizza (●), or Right half (◑) for each topping
+- **Visual Indicators**: Clear icons show exactly where toppings will be placed
+- **Independent Pricing**: Left and Right placements use "Half Pizza" pricing, Whole uses "Whole Pizza" pricing
+- **Flexible Combinations**: Mix and match toppings across different pizza sections
+- **Amount Control**: Light/Normal/Extra quantities for each topping placement
+
+### 💰 Dynamic Pricing System
+- **Real-Time Calculations**: Instant price updates as selections change
+- **Detailed Breakdown**: See base pizza cost plus individual topping prices
+- **Channel-Aware Pricing**: Prices automatically adjust based on selected store
+- **Variant-Based Pricing**: Each size/coverage combination has specific pricing
+- **Transparent Costs**: Clear display of all charges before ordering
+
+### 🎨 Interactive Visual Experience
+- **Live Pizza Visualization**: Real-time preview of your pizza as you build it
+- **Topping Representation**: Visual display of selected ingredients
+- **Sticky Interface**: Pizza preview stays visible while scrolling through options
+- **Responsive Design**: Optimized for desktop, tablet, and mobile devices
+- **Material UI Components**: Modern, accessible interface elements
+
+### 🛒 Cart & Order Management
+- **Advanced Cart Integration**: Add fully configured pizzas with all customizations
+- **Order Persistence**: Cart maintains state across sessions
+- **Instant Ordering**: Quick order placement with delivery method selection
+- **Order Confirmation**: Generated order numbers and confirmation details
+- **Delivery Options**: Support for both pickup and delivery
+
+### 🔧 Technical Architecture
+
+#### Frontend Stack
+- **React 18** with TypeScript for type safety
+- **Material UI (MUI)** for consistent, accessible components
+- **Responsive Grid System** for optimal layout across devices
+- **Real-time State Management** for instant UI updates
+
+#### Backend Integration
+- **Node.js/Express** server with CommerceTools SDK
+- **Full CommerceTools API Integration**:
   - Product type queries for pizzas and ingredients
+  - Category-based ingredient filtering
   - Channel-specific pricing retrieval
   - Cart and order management
-  - Real-time inventory and pricing data
-- **Data Management**: 
-  - Pizza product type with size and crust attributes
-  - Ingredient product type with category classification
-  - Channel-based pricing for multi-store support
+  - Real-time inventory synchronization
 
-## API Endpoints
+#### Data Architecture
+- **Pizza Product Type** with size, crust, and availability attributes
+- **Ingredient Product Type** with category classification and pricing variants
+- **Multi-Variant Pricing**: Each ingredient has variants for different sizes and coverage options
+- **Channel-Based Pricing**: Store-specific pricing for all products
 
-### Products
-- `GET /api/products/pizza-bases?channel=<channelId>` - Fetch pizza bases with channel-specific pricing
-- `GET /api/products/ingredients?category=<category>` - Fetch ingredients by category (sauce, cheese, meat, vegetable)
-- `GET /api/channels` - Fetch available store channels
+## 🚀 API Endpoints
 
-### Cart & Orders
-- `POST /api/cart` - Create new cart with pizza configuration
-- `POST /api/cart/:cartId/line-items` - Add pizza to existing cart
-- `POST /api/orders` - Create order from cart
+### Product Management
+```
+GET /api/products/pizza-bases?channel=<channelId>
+    - Fetch pizza bases with channel-specific pricing
+    - Returns size options, crust availability, and pricing
 
-## Development
+GET /api/products/ingredients?category=<category>&channel=<channelId>
+    - Fetch ingredients by category (sauce, cheese, meat, vegetable)
+    - Returns variants with size/coverage-specific pricing
+
+GET /api/channels
+    - Fetch available store channels/locations
+    - Returns store information and channel IDs
+```
+
+### Cart & Order Operations
+```
+POST /api/carts
+    - Create new cart with pizza configuration
+    - Supports complex topping placement and amounts
+
+POST /api/carts/:cartId
+    - Add pizza to existing cart
+    - Maintains full configuration details
+
+POST /api/orders
+    - Create order from cart
+    - Includes delivery method and customer information
+```
+
+## 🛠️ Development Setup
 
 ### Prerequisites
-- Node.js 16+ 
-- CommerceTools project with configured product types
-- Environment variables for CommerceTools API credentials
+- **Node.js 16+** 
+- **CommerceTools Project** with configured product types and channels
+- **Environment Configuration** for CommerceTools API credentials
 
-### Getting Started
+### Quick Start
 
-1. **Clone the repository**
+1. **Clone and Install**
    ```bash
    git clone <repository-url>
    cd orderpizza
-   ```
-
-2. **Install dependencies**
-   ```bash
+   
    # Install server dependencies
    npm install
    
@@ -89,9 +133,9 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
    cd client && npm install
    ```
 
-3. **Configure environment variables**
-   Create `.env` file in the root directory with your CommerceTools credentials:
-   ```
+2. **Environment Configuration**
+   Create `.env` file in root directory:
+   ```env
    CTP_PROJECT_KEY=your-project-key
    CTP_CLIENT_SECRET=your-client-secret
    CTP_CLIENT_ID=your-client-id
@@ -100,45 +144,150 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
    CTP_SCOPES=your-scopes
    ```
 
-4. **Start development servers**
+3. **Start Development Servers**
    ```bash
-   # Start backend server (from root directory)
-   npm run dev
+   # Backend server (from root)
+   node server.js
    
-   # Start frontend server (from client directory)
+   # Frontend server (from client directory)
    cd client && npm start
    ```
+
+4. **Access Application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5000
 
 ### Project Structure
 ```
 orderpizza/
-├── server/                 # Backend Express server
-│   ├── src/
-│   │   ├── routes/        # API route handlers
-│   │   └── services/      # CommerceTools service layer
-├── client/                # Frontend React application
+├── server.js              # Express server with CommerceTools integration
+├── client/                # React frontend application
 │   ├── src/
 │   │   ├── components/    # React components
-│   │   ├── api/          # API client functions
-│   │   └── types/        # TypeScript type definitions
-└── package.json          # Root package configuration
+│   │   │   ├── PizzaBuilder.tsx      # Main pizza customization interface
+│   │   │   ├── PizzaVisualizer.tsx   # Interactive pizza preview
+│   │   │   ├── Cart.tsx              # Shopping cart management
+│   │   │   └── App.tsx               # Main application component
+│   │   ├── api/          # CommerceTools API client
+│   │   └── types/        # TypeScript interfaces
+│   └── public/           # Static assets including pizza favicon
+└── package.json          # Dependencies and scripts
 ```
 
-### CommerceTools Setup
+## 🏗️ CommerceTools Configuration
 
-The application requires specific product types in CommerceTools:
+### Required Product Types
 
-1. **Pizza Product Type** with attributes:
-   - `availableCrusts` (Set of Text)
-   - `crustType` (Text)
-   - `size` (Text)
+1. **Pizza Product Type**
+   ```json
+   {
+     "name": "Pizza",
+     "attributes": [
+       {
+         "name": "availableCrusts",
+         "type": "set",
+         "elementType": "text"
+       },
+       {
+         "name": "crustType", 
+         "type": "text"
+       },
+       {
+         "name": "size",
+         "type": "text"
+       }
+     ]
+   }
+   ```
 
-2. **Ingredient Product Type** with attributes:
-   - `category` (Text) - values: sauce, cheese, meat, vegetable
-   - `isHalfPizzaConfigurable` (Boolean)
+2. **Ingredient Product Type**
+   ```json
+   {
+     "name": "Ingredient",
+     "attributes": [
+       {
+         "name": "category",
+         "type": "text"
+       },
+       {
+         "name": "isHalfPizzaConfigurable",
+         "type": "boolean"
+       },
+       {
+         "name": "pizza-size",
+         "type": "enum",
+         "values": ["10\" Small", "12\" Medium", "14\" Large", "16\" XL"]
+       },
+       {
+         "name": "coverage",
+         "type": "enum", 
+         "values": ["Whole Pizza", "Half Pizza"]
+       }
+     ]
+   }
+   ```
 
-3. **Channels** configured for different store locations
+3. **Categories**
+   - `pizza` - Pizza base products
+   - `sauce` - Sauce ingredients
+   - `cheese` - Cheese ingredients  
+   - `meat` - Meat toppings
+   - `vegetable` - Vegetable toppings
 
-## License
+4. **Channels**
+   - Store #9267: Channel for first location
+   - Store #8783: Channel for second location
 
-[MIT License](LICENSE)
+### Pricing Structure
+Each ingredient requires variants for all size/coverage combinations:
+- 4 sizes × 2 coverage options = 8 variants per ingredient
+- Each variant has channel-specific pricing for both stores
+- Pricing automatically filters to US country only
+
+## 🎯 Key Features Highlights
+
+### Advanced Topping Placement
+Unlike traditional pizza ordering systems, this application offers granular control over topping placement:
+- **Left Half**: Perfect for sharing pizzas with different preferences
+- **Whole Pizza**: Traditional full-pizza topping coverage
+- **Right Half**: Allows for asymmetric topping combinations
+
+### Intelligent Pricing
+The pricing system automatically:
+- Calculates base pizza cost based on size and crust
+- Adds appropriate topping costs based on size and placement
+- Updates in real-time as selections change
+- Adjusts for different store locations
+- Provides transparent cost breakdown
+
+### Seamless Integration
+Built on CommerceTools' robust commerce platform:
+- Real-time inventory management
+- Scalable pricing and product management
+- Multi-channel support for franchise operations
+- Enterprise-grade reliability and performance
+
+## 📱 Browser Support
+
+- **Modern Browsers**: Chrome, Firefox, Safari, Edge (latest versions)
+- **Mobile Responsive**: Optimized for iOS and Android devices
+- **Progressive Web App**: Installable on mobile devices
+- **Pizza Favicon**: Custom pizza icon for brand recognition
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  Built with ❤️ using CommerceTools, React, and Material UI
+</p>

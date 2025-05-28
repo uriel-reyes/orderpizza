@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Pizza Favicon</title>
+</head>
+<body>
+    <h1>Pizza Favicon Generator</h1>
+    <canvas id="canvas" width="32" height="32" style="border: 1px solid #ccc; image-rendering: pixelated; width: 128px; height: 128px;"></canvas>
+    <br><br>
+    <button onclick="generateFavicon()">Generate Pizza Favicon</button>
+    <br><br>
+    <a id="downloadLink" style="display: none;">Download favicon.ico</a>
+
+    <script>
+        function generateFavicon() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, 32, 32);
+            
+            // Set background to transparent
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // Draw pizza emoji
+            ctx.font = '28px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🍕', 16, 16);
+            
+            // Convert to blob and create download link
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const link = document.getElementById('downloadLink');
+                link.href = url;
+                link.download = 'favicon.ico';
+                link.style.display = 'block';
+                link.textContent = 'Download favicon.ico (Right-click and save as favicon.ico)';
+            }, 'image/x-icon');
+        }
+        
+        // Auto-generate on page load
+        window.onload = function() {
+            generateFavicon();
+        };
+    </script>
+</body>
+</html> 
