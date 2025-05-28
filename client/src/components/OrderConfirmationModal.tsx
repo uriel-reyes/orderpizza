@@ -53,20 +53,24 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
   // Determine if order is delivery or pickup
   const isDelivery = order.custom?.fields?.Method === 'delivery';
 
-  // Filter line items to only show pizza items (items with custom fields)
-  const pizzaItems = order.lineItems.filter(item => item.custom?.fields);
+  // Filter line items to only show pizza and drink items (not ingredients)
+  const displayItems = order.lineItems.filter(item => item.productType?.id !== '667eec2c-421d-46e6-8af3-8a53644aa6c0');
 
   // Render pizza configuration from custom fields
   const renderPizzaConfiguration = (customFields: any) => {
     const chips = [];
     
     // Add sauce
-    if (customFields.Sauce) {
+    if (customFields['Sauce-Type']) {
+      chips.push(`Sauce: ${customFields['Sauce-Type']}`);
+    } else if (customFields.Sauce) {
       chips.push(`Sauce: ${customFields.Sauce}`);
     }
     
     // Add cheese
-    if (customFields.Cheese) {
+    if (customFields['Cheese-Type']) {
+      chips.push(`Cheese: ${customFields['Cheese-Type']}`);
+    } else if (customFields.Cheese) {
       chips.push(`Cheese: ${customFields.Cheese}`);
     }
     
@@ -155,16 +159,25 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
         </Typography>
         
         <List disablePadding>
-          {pizzaItems.map((item) => {
-            const configurationChips = renderPizzaConfiguration(item.custom?.fields || {});
+          {displayItems.map((item) => {
+            // Only show configuration for pizza items
+            const configurationChips = item.productType?.id === '1950208a-8703-4ce5-b4e0-fea5fee190f3' 
+              ? renderPizzaConfiguration(item.custom?.fields || {})
+              : [];
             
             return (
               <Paper key={item.id} elevation={0} variant="outlined" sx={{ mb: 2, overflow: 'hidden' }}>
                 <ListItem sx={{ py: 2, bgcolor: 'grey.50' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                    <PizzaIcon sx={{ mr: 2, color: 'secondary.main' }} />
+                    {item.productType?.id === '1950208a-8703-4ce5-b4e0-fea5fee190f3' ? (
+                      <PizzaIcon sx={{ mr: 2, color: 'secondary.main' }} />
+                    ) : (
+                      <StoreIcon sx={{ mr: 2, color: 'secondary.main' }} />
+                    )}
                     <ListItemText 
-                      primary={<Typography variant="subtitle1" fontWeight="bold">Pizza</Typography>}
+                      primary={<Typography variant="subtitle1" fontWeight="bold">
+                        {item.name.en || 'Item'}
+                      </Typography>}
                       secondary={`Qty: ${item.quantity}`}
                     />
                     <Typography variant="subtitle1">

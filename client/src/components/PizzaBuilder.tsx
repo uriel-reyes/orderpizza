@@ -63,7 +63,7 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     variantId: 0,
     size: '',
     crustType: '',
-    sauce: { productId: '', amount: 'normal' },
+    sauce: { productId: '', amount: 'normal', name: '' },
     cheese: {},
     toppings: {}
   });
@@ -97,7 +97,7 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
           variantId: 0,
           size: '',
           crustType: '',
-          sauce: { productId: '', amount: 'normal' },
+          sauce: { productId: '', amount: 'normal', name: '' },
           cheese: {},
           toppings: {}
         };
@@ -187,6 +187,28 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
   const getSelectedVariant = () => {
     if (!selectedBase || !selectedCrust) return null;
     return selectedBase.variants.find(v => v.crustType === selectedCrust);
+  };
+
+  // Helper function to check if a product is "None" or "No Sauce"
+  const isNoneProduct = (product: IngredientProduct) => {
+    const name = product.name.toLowerCase();
+    return name.includes('none') || name.includes('no sauce');
+  };
+
+  // Helper function to get filtered cheese options (exclude "None")
+  const getFilteredCheeses = () => {
+    return cheeses.filter(cheese => !isNoneProduct(cheese));
+  };
+
+  // Helper function to check if current selection should show amount controls
+  const shouldShowAmountControls = (productId: string, category: 'sauce' | 'cheese') => {
+    if (category === 'sauce') {
+      const sauce = sauces.find(s => s.id === productId);
+      return sauce ? !isNoneProduct(sauce) : false;
+    } else {
+      const cheese = cheeses.find(c => c.id === productId);
+      return cheese ? !isNoneProduct(cheese) : false;
+    }
   };
 
   // Price calculation helpers
@@ -354,9 +376,13 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
 
   // Handle sauce change
   const handleSauceChange = (productId: string, amount: 'light' | 'normal' | 'extra') => {
+    // Find the sauce name
+    const sauce = sauces.find(s => s.id === productId);
+    const sauceName = sauce ? sauce.name : '';
+    
     const newConfig = {
       ...configuration,
-      sauce: { productId, amount }
+      sauce: { productId, amount, name: sauceName }
     };
     
     setConfiguration(newConfig);
@@ -369,11 +395,15 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     amount: 'none' | 'light' | 'normal' | 'extra',
     side: 'whole' | 'left' | 'right' = 'whole'
   ) => {
+    // Find the cheese name
+    const cheese = cheeses.find(c => c.id === productId);
+    const cheeseName = cheese ? cheese.name : '';
+    
     const newConfig = {
       ...configuration,
       cheese: {
         ...configuration.cheese,
-        [side]: { productId, amount }
+        [side]: { productId, amount, name: cheeseName }
       }
     };
     
@@ -390,21 +420,25 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
   ) => {
     const currentToppings = configuration.toppings[side] || [];
     let newToppings;
+    
+    // Find the ingredient name
+    const ingredient = [...meats, ...vegetables].find(ing => ing.id === productId);
+    const ingredientName = ingredient ? ingredient.name : '';
 
     if (action === 'remove') {
       newToppings = currentToppings.filter(t => t.productId !== productId);
     } else if (action === 'update') {
       newToppings = currentToppings.map(t => 
-        t.productId === productId ? { ...t, amount } : t
+        t.productId === productId ? { ...t, amount, name: ingredientName } : t
       );
     } else {
       const existingIndex = currentToppings.findIndex(t => t.productId === productId);
       if (existingIndex >= 0) {
         newToppings = currentToppings.map(t => 
-          t.productId === productId ? { ...t, amount } : t
+          t.productId === productId ? { ...t, amount, name: ingredientName } : t
         );
       } else {
-        newToppings = [...currentToppings, { productId, amount }];
+        newToppings = [...currentToppings, { productId, amount, name: ingredientName }];
       }
     }
 
@@ -449,6 +483,10 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
 
   // Handle topping side change
   const handleToppingSideChange = (productId: string, newSide: 'whole' | 'left' | 'right') => {
+    // Find the ingredient name
+    const ingredient = [...meats, ...vegetables].find(ing => ing.id === productId);
+    const ingredientName = ingredient ? ingredient.name : '';
+    
     // First, remove the topping from all sides
     const newConfig = {
       ...configuration,
@@ -462,7 +500,7 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
     // Then add it to the new side with the current amount
     const currentAmount = getToppingAmount(productId, getToppingSide(productId));
     const currentToppings = newConfig.toppings[newSide] || [];
-    newConfig.toppings[newSide] = [...currentToppings, { productId, amount: currentAmount }];
+    newConfig.toppings[newSide] = [...currentToppings, { productId, amount: currentAmount, name: ingredientName }];
 
     setConfiguration(newConfig);
     onConfigurationChange(newConfig);
@@ -689,7 +727,7 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                       >
                         <CardContent>
                           <Typography variant="subtitle1">{sauce.name}</Typography>
-                          {configuration.sauce.productId === sauce.id && (
+                          {configuration.sauce.productId === sauce.id && shouldShowAmountControls(sauce.id, 'sauce') && (
                             <Box sx={{ mt: 1 }} onClick={(e) => e.stopPropagation()}>
                               <ToggleButtonGroup
                                 value={configuration.sauce.amount}
@@ -723,7 +761,7 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                 </Typography>
                 
                 <Grid container spacing={2}>
-                  {cheeses.map(cheese => (
+                  {getFilteredCheeses().map(cheese => (
                     <Grid key={cheese.id} sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
                       <Card 
                         variant={configuration.cheese.whole?.productId === cheese.id ? "outlined" : "elevation"}
@@ -736,7 +774,7 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                       >
                         <CardContent>
                           <Typography variant="subtitle1">{cheese.name}</Typography>
-                          {configuration.cheese.whole?.productId === cheese.id && (
+                          {configuration.cheese.whole?.productId === cheese.id && shouldShowAmountControls(cheese.id, 'cheese') && (
                             <Box sx={{ mt: 1 }} onClick={(e) => e.stopPropagation()}>
                               <ToggleButtonGroup
                                 value={configuration.cheese.whole.amount}
@@ -747,13 +785,34 @@ const PizzaBuilder: React.FC<PizzaBuilderProps> = ({
                                 }}
                                 size="small"
                               >
-                                <ToggleButton value="none">None</ToggleButton>
                                 <ToggleButton value="light">Light</ToggleButton>
                                 <ToggleButton value="normal">Normal</ToggleButton>
                                 <ToggleButton value="extra">Extra</ToggleButton>
                               </ToggleButtonGroup>
                             </Box>
                           )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+                
+                {/* Add "None" option separately */}
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  {cheeses.filter(cheese => isNoneProduct(cheese)).map(cheese => (
+                    <Grid key={cheese.id} sx={{ gridColumn: { xs: 'span 12', sm: 'span 6' } }}>
+                      <Card 
+                        variant={configuration.cheese.whole?.productId === cheese.id ? "outlined" : "elevation"}
+                        sx={{ 
+                          cursor: 'pointer',
+                          border: configuration.cheese.whole?.productId === cheese.id ? 2 : 1,
+                          borderColor: configuration.cheese.whole?.productId === cheese.id ? 'primary.main' : 'divider'
+                        }}
+                        onClick={() => handleCheeseChange(cheese.id, 'none', 'whole')}
+                      >
+                        <CardContent>
+                          <Typography variant="subtitle1">{cheese.name}</Typography>
+                          {/* No amount controls for "None" cheese */}
                         </CardContent>
                       </Card>
                     </Grid>

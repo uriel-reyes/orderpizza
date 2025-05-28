@@ -48,30 +48,34 @@ const Cart: React.FC<CartProps> = ({
     return `$${(cents / 100).toFixed(2)}`;
   };
 
-  // Get total items count (only count pizza bases, not individual ingredients)
+  // Get total items count (only count pizza and drink items, not ingredients)
   const getTotalItems = () => {
     if (!cart || !cart.lineItems) return 0;
-    // Only count items that have custom fields (pizza bases), not individual ingredients
+    // Filter out ingredient items using product type ID
     return cart.lineItems
-      .filter(item => item.custom?.fields)
+      .filter(item => item.productType?.id !== '667eec2c-421d-46e6-8af3-8a53644aa6c0')
       .reduce((total, item) => total + item.quantity, 0);
   };
 
-  // Filter line items to only show pizza bases (items with custom configuration)
-  const getPizzaLineItems = () => {
+  // Filter line items to only show pizza and drink items (not ingredients)
+  const getDisplayLineItems = () => {
     if (!cart || !cart.lineItems) return [];
-    return cart.lineItems.filter(item => item.custom?.fields);
+    return cart.lineItems.filter(item => item.productType?.id !== '667eec2c-421d-46e6-8af3-8a53644aa6c0');
   };
 
   // Render pizza configuration from custom fields
   const renderPizzaConfiguration = (customFields: any) => {
     const config = [];
     
-    if (customFields.Sauce) {
+    if (customFields['Sauce-Type']) {
+      config.push(`Sauce: ${customFields['Sauce-Type']}`);
+    } else if (customFields.Sauce) {
       config.push(`Sauce: ${customFields.Sauce}`);
     }
     
-    if (customFields.Cheese) {
+    if (customFields['Cheese-Type']) {
+      config.push(`Cheese: ${customFields['Cheese-Type']}`);
+    } else if (customFields.Cheese) {
       config.push(`Cheese: ${customFields.Cheese}`);
     }
     
@@ -135,42 +139,54 @@ const Cart: React.FC<CartProps> = ({
     return (
       <>
         <List disablePadding>
-          {getPizzaLineItems().map((item) => (
+          {getDisplayLineItems().map((item) => (
             <React.Fragment key={item.id}>
               <ListItem sx={{ py: 2 }} alignItems="flex-start">
                 <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 1 }}>
                     <Typography variant="subtitle1" fontWeight="bold">
-                      {item.name.en || 'Pizza'}
+                      {item.name.en || 'Item'}
                     </Typography>
                     <Typography variant="subtitle1">
                       {formatPrice(item.totalPrice.centAmount)}
                     </Typography>
                   </Box>
                   
-                  {/* Crust Style and Quantity */}
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      <strong>Crust:</strong> {item.variant?.key || "Standard Crust"}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      <strong>Quantity:</strong> {item.quantity}
-                    </Typography>
-                  </Box>
-                  
-                  {/* Pizza Configuration */}
-                  {item.custom?.fields && (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                      {renderPizzaConfiguration(item.custom.fields).map((config: string) => (
-                        <Chip 
-                          key={config} 
-                          label={config} 
-                          size="small" 
-                          color="primary" 
-                          variant="outlined"
-                          sx={{ fontSize: '0.7rem' }}
-                        />
-                      ))}
+                  {/* Show different details based on product type */}
+                  {item.productType?.id === '1950208a-8703-4ce5-b4e0-fea5fee190f3' ? (
+                    <>
+                      {/* Pizza items - show crust and configuration */}
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Crust:</strong> {item.variant?.key || "Standard Crust"}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Quantity:</strong> {item.quantity}
+                        </Typography>
+                      </Box>
+                      
+                      {/* Pizza Configuration */}
+                      {item.custom?.fields && (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                          {renderPizzaConfiguration(item.custom.fields).map((config: string) => (
+                            <Chip 
+                              key={config} 
+                              label={config} 
+                              size="small" 
+                              color="primary" 
+                              variant="outlined"
+                              sx={{ fontSize: '0.7rem' }}
+                            />
+                          ))}
+                        </Box>
+                      )}
+                    </>
+                  ) : (
+                    /* For drinks and other items */
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Quantity:</strong> {item.quantity}
+                      </Typography>
                     </Box>
                   )}
                 </Box>

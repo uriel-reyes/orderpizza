@@ -347,7 +347,9 @@ app.post('/api/carts/pizza', async (req, res) => {
       Cheese: '',
       Left: [],
       Whole: [],
-      Right: []
+      Right: [],
+      'Sauce-Type': '',
+      'Cheese-Type': ''
     };
 
     // Process sauce
@@ -355,6 +357,7 @@ app.post('/api/carts/pizza', async (req, res) => {
       const sauceInfo = await getProductInfo(configuration.sauce.productId);
       if (sauceInfo.category === 'sauce') {
         lineItemCustomFields.Sauce = configuration.sauce.amount || 'normal';
+        lineItemCustomFields['Sauce-Type'] = sauceInfo.name;
       }
     }
 
@@ -363,6 +366,7 @@ app.post('/api/carts/pizza', async (req, res) => {
       const cheeseInfo = await getProductInfo(configuration.cheese.whole.productId);
       if (cheeseInfo.category === 'cheese') {
         lineItemCustomFields.Cheese = configuration.cheese.whole.amount || 'normal';
+        lineItemCustomFields['Cheese-Type'] = cheeseInfo.name;
       }
     }
     if (configuration.cheese?.left?.productId) {
@@ -376,6 +380,14 @@ app.post('/api/carts/pizza', async (req, res) => {
       if (cheeseInfo.category === 'cheese') {
         lineItemCustomFields.Right.push(`${cheeseInfo.name} (${configuration.cheese.right.amount || 'normal'})`);
       }
+    }
+
+    // Also check if the client explicitly sent these values
+    if (req.body['Sauce-Type']) {
+      lineItemCustomFields['Sauce-Type'] = req.body['Sauce-Type'];
+    }
+    if (req.body['Cheese-Type']) {
+      lineItemCustomFields['Cheese-Type'] = req.body['Cheese-Type'];
     }
 
     // Process toppings (meats and vegetables)
@@ -802,7 +814,9 @@ app.post('/api/carts/:cartId/pizza', async (req, res) => {
       Cheese: '',
       Left: [],
       Whole: [],
-      Right: []
+      Right: [],
+      'Sauce-Type': '',
+      'Cheese-Type': ''
     };
 
     // Process sauce
@@ -810,6 +824,7 @@ app.post('/api/carts/:cartId/pizza', async (req, res) => {
       const sauceInfo = await getProductInfo(configuration.sauce.productId);
       if (sauceInfo.category === 'sauce') {
         lineItemCustomFields.Sauce = configuration.sauce.amount || 'normal';
+        lineItemCustomFields['Sauce-Type'] = sauceInfo.name;
       }
     }
 
@@ -818,6 +833,7 @@ app.post('/api/carts/:cartId/pizza', async (req, res) => {
       const cheeseInfo = await getProductInfo(configuration.cheese.whole.productId);
       if (cheeseInfo.category === 'cheese') {
         lineItemCustomFields.Cheese = configuration.cheese.whole.amount || 'normal';
+        lineItemCustomFields['Cheese-Type'] = cheeseInfo.name;
       }
     }
     if (configuration.cheese?.left?.productId) {
@@ -831,6 +847,14 @@ app.post('/api/carts/:cartId/pizza', async (req, res) => {
       if (cheeseInfo.category === 'cheese') {
         lineItemCustomFields.Right.push(`${cheeseInfo.name} (${configuration.cheese.right.amount || 'normal'})`);
       }
+    }
+
+    // Also check if the client explicitly sent these values
+    if (req.body['Sauce-Type']) {
+      lineItemCustomFields['Sauce-Type'] = req.body['Sauce-Type'];
+    }
+    if (req.body['Cheese-Type']) {
+      lineItemCustomFields['Cheese-Type'] = req.body['Cheese-Type'];
     }
 
     // Process toppings (meats and vegetables)

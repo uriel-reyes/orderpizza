@@ -189,9 +189,22 @@ export interface Cart {
       currencyCode: string;
       centAmount: number;
     };
+    productType?: {
+      id: string;
+      typeId: string;
+      obj?: {
+        key: string;
+        name: string;
+      };
+    };
     custom?: {
       fields: {
         Ingredients: string[];
+        'Sauce-Type'?: string;
+        'Cheese-Type'?: string;
+        Left?: string[];
+        Whole?: string[];
+        Right?: string[];
       }
     }
   }>;
@@ -229,9 +242,22 @@ export interface Order {
       currencyCode: string;
       centAmount: number;
     };
+    productType?: {
+      id: string;
+      typeId: string;
+      obj?: {
+        key: string;
+        name: string;
+      };
+    };
     custom?: {
       fields: {
         Ingredients: string[];
+        'Sauce-Type'?: string;
+        'Cheese-Type'?: string;
+        Left?: string[];
+        Whole?: string[];
+        Right?: string[];
       }
     }
   }>;
@@ -518,16 +544,17 @@ export interface PizzaConfiguration {
   sauce: {
     productId: string;
     amount: 'light' | 'normal' | 'extra';
+    name?: string;
   };
   cheese: {
-    whole?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra' };
-    left?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra' };
-    right?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra' };
+    whole?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra'; name?: string };
+    left?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra'; name?: string };
+    right?: { productId: string; amount: 'none' | 'light' | 'normal' | 'extra'; name?: string };
   };
   toppings: {
-    whole?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra' }>;
-    left?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra' }>;
-    right?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra' }>;
+    whole?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra'; name?: string }>;
+    left?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra'; name?: string }>;
+    right?: Array<{ productId: string; amount: 'light' | 'normal' | 'extra'; name?: string }>;
   };
 }
 
@@ -618,11 +645,24 @@ export const createCartWithPizza = async (
     };
     
     const storeKey = selectedChannelId ? (channelToStoreMap[selectedChannelId] || '9267') : '9267';
+    const channelId = selectedChannelId || 'afb03151-1faa-4ec9-9594-3e3580d30da9'; // Default to store #9267
+    
+    // Extract sauce and cheese information
+    const sauceType = configuration.sauce.name || '';
+    const cheeseType = configuration.cheese.whole?.name || '';
+    
+    console.log('Creating cart with sauce type:', sauceType);
+    console.log('Creating cart with cheese type:', cheeseType);
     
     const response = await axios.post<Cart>(`${API_BASE}/carts/pizza`, {
       configuration,
+      'Sauce-Type': sauceType,
+      'Cheese-Type': cheeseType,
       deliveryMethod,
       storeKey,
+      channelId, // Explicitly include the channel ID
+      country: 'US',
+      currency: 'USD',
       timestamp: new Date().toISOString()
     });
     return response.data;
@@ -647,9 +687,24 @@ export const addPizzaToCartAdvanced = async (
   configuration: PizzaConfiguration
 ): Promise<Cart> => {
   try {
+    // Extract sauce and cheese information
+    const sauceType = configuration.sauce.name || '';
+    const cheeseType = configuration.cheese.whole?.name || '';
+    
+    console.log('Adding pizza to cart with sauce type:', sauceType);
+    console.log('Adding pizza to cart with cheese type:', cheeseType);
+    
+    // Default channel ID for store #9267
+    const channelId = 'afb03151-1faa-4ec9-9594-3e3580d30da9';
+    
     const response = await axios.post<Cart>(`${API_BASE}/carts/${cartId}/pizza`, {
       version: cartVersion,
       configuration,
+      'Sauce-Type': sauceType,
+      'Cheese-Type': cheeseType,
+      channelId, // Explicitly include the channel ID
+      country: 'US',
+      currency: 'USD',
       timestamp: new Date().toISOString()
     });
     return response.data;
