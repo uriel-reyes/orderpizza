@@ -31,6 +31,7 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
 - **Sauce Selection**: Multiple sauce varieties with Light/Normal/Extra amounts
 - **Cheese Options**: Various cheese types with None/Light/Normal/Extra amounts
 - **Premium Toppings**: Extensive meat and vegetable selections
+- **Enhanced Ingredient Tracking**: System now captures the specific sauce and cheese type selections, not just amount preferences
 
 #### Advanced Half-Pizza Controls
 - **Intuitive Placement**: Choose Left half (◐), Whole pizza (●), or Right half (◑) for each topping
@@ -85,7 +86,7 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
 - **Multi-Variant Pricing**: Each ingredient has variants for different sizes and coverage options
 - **Channel-Based Pricing**: Store-specific pricing for all products
 - **Custom Types**: 
-  - Line item level: Pizza configuration details (sauce, cheese, toppings by placement)
+  - Line item level: Pizza configuration details (sauce type, sauce amount, cheese type, cheese amount, toppings by placement)
   - Cart/Order level: Delivery method and fulfillment information
 
 ## 🚀 API Endpoints
@@ -278,6 +279,16 @@ orderpizza/
          "type": "Set",
          "elementType": "String", 
          "required": false
+       },
+       {
+         "name": "Sauce-Type",
+         "type": "String",
+         "required": false
+       },
+       {
+         "name": "Cheese-Type",
+         "type": "String",
+         "required": false
        }
      ]
    }
@@ -334,6 +345,7 @@ The application uses a sophisticated data model where:
 - **Ingredients** are individual products with size/coverage variants
 - **Custom line items** store the complete pizza assembly
 - **Real-time pricing** calculates based on selected configuration
+- **Ingredient tracking** captures detailed information about selected sauce and cheese types
 
 ### Dual Order Flows
 1. **Add to Cart Flow**: Build multiple pizzas, review in cart, select delivery method, complete order
