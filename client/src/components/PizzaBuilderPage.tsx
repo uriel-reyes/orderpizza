@@ -64,6 +64,7 @@ const PizzaBuilderPage: React.FC<PizzaBuilderPageProps> = ({
   const [deliveryMethodOpen, setDeliveryMethodOpen] = useState<boolean>(false);
   const [orderConfirmationOpen, setOrderConfirmationOpen] = useState<boolean>(false);
   const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [isCartCheckoutFlow, setIsCartCheckoutFlow] = useState(false);
   
   // Notification state
   const [notification, setNotification] = useState<{
@@ -142,11 +143,21 @@ const PizzaBuilderPage: React.FC<PizzaBuilderPageProps> = ({
       return;
     }
     
+    setIsCartCheckoutFlow(false);
     setDeliveryMethodOpen(true);
   };
 
-  // Handle delivery method confirmation
+  // Handle delivery method confirmation - routes to appropriate handler
   const handleDeliveryMethodConfirm = async (method: 'pickup' | 'delivery') => {
+    if (isCartCheckoutFlow) {
+      await handleCartDeliveryMethodConfirm(method);
+    } else {
+      await handleInstantOrderConfirm(method);
+    }
+  };
+
+  // Handle delivery method confirmation for instant orders
+  const handleInstantOrderConfirm = async (method: 'pickup' | 'delivery') => {
     if (!configuration) return;
     
     try {
@@ -162,6 +173,58 @@ const PizzaBuilderPage: React.FC<PizzaBuilderPageProps> = ({
       setOrderDetails(order);
       setDeliveryMethodOpen(false);
       setOrderConfirmationOpen(true);
+      
+      setNotification({
+        open: true,
+        message: `Order #${order.orderNumber} created successfully!`,
+        severity: 'success'
+      });
+      
+    } catch (error) {
+      console.error('Error creating order:', error);
+      setNotification({
+        open: true,
+        message: error instanceof Error ? error.message : 'Failed to create order',
+        severity: 'error'
+      });
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
+  // Handle cart checkout
+  const handleCartCheckout = () => {
+    if (!cart) {
+      setNotification({
+        open: true,
+        message: 'Your cart is empty',
+        severity: 'warning'
+      });
+      return;
+    }
+    
+    // Close cart and open delivery method modal
+    setCartOpen(false);
+    setIsCartCheckoutFlow(true);
+    setDeliveryMethodOpen(true);
+  };
+
+  // Handle delivery method confirmation for cart checkout
+  const handleCartDeliveryMethodConfirm = async (method: 'pickup' | 'delivery') => {
+    if (!cart) return;
+    
+    try {
+      setOrderLoading(true);
+      
+      // Create order from existing cart
+      const order = await createOrder(cart.id, cart.version, method);
+      
+      setOrderDetails(order);
+      setDeliveryMethodOpen(false);
+      setOrderConfirmationOpen(true);
+      
+      // Clear cart after successful order
+      setCart(null);
       
       setNotification({
         open: true,
@@ -270,7 +333,7 @@ const PizzaBuilderPage: React.FC<PizzaBuilderPageProps> = ({
         error={null}
         open={cartOpen}
         onClose={() => setCartOpen(false)}
-        onCheckout={() => console.log('Checkout')}
+        onCheckout={handleCartCheckout}
       />
       
       {/* Delivery Method Modal */}

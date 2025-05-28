@@ -48,10 +48,46 @@ const Cart: React.FC<CartProps> = ({
     return `$${(cents / 100).toFixed(2)}`;
   };
 
-  // Get total items count
+  // Get total items count (only count pizza bases, not individual ingredients)
   const getTotalItems = () => {
     if (!cart || !cart.lineItems) return 0;
-    return cart.lineItems.reduce((total, item) => total + item.quantity, 0);
+    // Only count items that have custom fields (pizza bases), not individual ingredients
+    return cart.lineItems
+      .filter(item => item.custom?.fields)
+      .reduce((total, item) => total + item.quantity, 0);
+  };
+
+  // Filter line items to only show pizza bases (items with custom configuration)
+  const getPizzaLineItems = () => {
+    if (!cart || !cart.lineItems) return [];
+    return cart.lineItems.filter(item => item.custom?.fields);
+  };
+
+  // Render pizza configuration from custom fields
+  const renderPizzaConfiguration = (customFields: any) => {
+    const config = [];
+    
+    if (customFields.Sauce) {
+      config.push(`Sauce: ${customFields.Sauce}`);
+    }
+    
+    if (customFields.Cheese) {
+      config.push(`Cheese: ${customFields.Cheese}`);
+    }
+    
+    if (customFields.Left && customFields.Left.length > 0) {
+      config.push(`Left Half: ${customFields.Left.join(', ')}`);
+    }
+    
+    if (customFields.Whole && customFields.Whole.length > 0) {
+      config.push(`Whole Pizza: ${customFields.Whole.join(', ')}`);
+    }
+    
+    if (customFields.Right && customFields.Right.length > 0) {
+      config.push(`Right Half: ${customFields.Right.join(', ')}`);
+    }
+    
+    return config;
   };
 
   // Get cart content
@@ -99,7 +135,7 @@ const Cart: React.FC<CartProps> = ({
     return (
       <>
         <List disablePadding>
-          {cart.lineItems.map((item) => (
+          {getPizzaLineItems().map((item) => (
             <React.Fragment key={item.id}>
               <ListItem sx={{ py: 2 }} alignItems="flex-start">
                 <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -122,13 +158,13 @@ const Cart: React.FC<CartProps> = ({
                     </Typography>
                   </Box>
                   
-                  {/* Ingredients */}
-                  {item.custom?.fields.Ingredients && (
+                  {/* Pizza Configuration */}
+                  {item.custom?.fields && (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                      {item.custom.fields.Ingredients.map((ingredient: string) => (
+                      {renderPizzaConfiguration(item.custom.fields).map((config: string) => (
                         <Chip 
-                          key={ingredient} 
-                          label={ingredient.charAt(0).toUpperCase() + ingredient.slice(1)} 
+                          key={config} 
+                          label={config} 
                           size="small" 
                           color="primary" 
                           variant="outlined"

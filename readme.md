@@ -21,15 +21,18 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
 #### Size & Crust Selection
 - **Multiple Sizes**: 10" Small, 12" Medium, 14" Large, and 16" XL pizzas
 - **Dynamic Crust Options**: Size-specific crust availability
-  - Hand Tossed, Crunchy Thin, New York Style (varies by size)
+  - 10": Hand Tossed, Gluten Free
+  - 12": Hand Tossed, Crunchy Thin, New York Style, Parmesan Stuffed, Gluten Free
+  - 14": Hand Tossed, Crunchy Thin, New York Style
+  - 16": Hand Tossed, Crunchy Thin, New York Style
 - **Smart Defaults**: No pre-selection - customers choose their preferences
 
-#### Ingredient Customization
+#### Revolutionary Pizza Configuration System
 - **Sauce Selection**: Multiple sauce varieties with Light/Normal/Extra amounts
 - **Cheese Options**: Various cheese types with None/Light/Normal/Extra amounts
 - **Premium Toppings**: Extensive meat and vegetable selections
 
-#### Revolutionary Half-Pizza Controls
+#### Advanced Half-Pizza Controls
 - **Intuitive Placement**: Choose Left half (◐), Whole pizza (●), or Right half (◑) for each topping
 - **Visual Indicators**: Clear icons show exactly where toppings will be placed
 - **Independent Pricing**: Left and Right placements use "Half Pizza" pricing, Whole uses "Whole Pizza" pricing
@@ -40,7 +43,7 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
 - **Real-Time Calculations**: Instant price updates as selections change
 - **Detailed Breakdown**: See base pizza cost plus individual topping prices
 - **Channel-Aware Pricing**: Prices automatically adjust based on selected store
-- **Variant-Based Pricing**: Each size/coverage combination has specific pricing
+- **Variant-Based Pricing**: Each ingredient has size/coverage-specific variants
 - **Transparent Costs**: Clear display of all charges before ordering
 
 ### 🎨 Interactive Visual Experience
@@ -51,11 +54,13 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
 - **Material UI Components**: Modern, accessible interface elements
 
 ### 🛒 Cart & Order Management
+- **Dual Order Flows**: 
+  - **Add to Cart**: Build multiple pizzas, review in cart, then checkout
+  - **Instant Order**: Quick single-pizza ordering with immediate checkout
 - **Advanced Cart Integration**: Add fully configured pizzas with all customizations
 - **Order Persistence**: Cart maintains state across sessions
-- **Instant Ordering**: Quick order placement with delivery method selection
+- **Delivery Method Selection**: Support for both pickup and delivery
 - **Order Confirmation**: Generated order numbers and confirmation details
-- **Delivery Options**: Support for both pickup and delivery
 
 ### 🔧 Technical Architecture
 
@@ -71,21 +76,24 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
   - Product type queries for pizzas and ingredients
   - Category-based ingredient filtering
   - Channel-specific pricing retrieval
-  - Cart and order management
+  - Cart and order management with custom types
   - Real-time inventory synchronization
 
 #### Data Architecture
-- **Pizza Product Type** with size, crust, and availability attributes
-- **Ingredient Product Type** with category classification and pricing variants
+- **Pizza Base Products**: Individual products for each size (10", 12", 14", 16")
+- **Ingredient Products**: Individual products for each topping/ingredient
 - **Multi-Variant Pricing**: Each ingredient has variants for different sizes and coverage options
 - **Channel-Based Pricing**: Store-specific pricing for all products
+- **Custom Types**: 
+  - Line item level: Pizza configuration details (sauce, cheese, toppings by placement)
+  - Cart/Order level: Delivery method and fulfillment information
 
 ## 🚀 API Endpoints
 
 ### Product Management
 ```
 GET /api/products/pizza-bases?channel=<channelId>
-    - Fetch pizza bases with channel-specific pricing
+    - Fetch pizza base products with channel-specific pricing
     - Returns size options, crust availability, and pricing
 
 GET /api/products/ingredients?category=<category>&channel=<channelId>
@@ -99,17 +107,19 @@ GET /api/channels
 
 ### Cart & Order Operations
 ```
-POST /api/carts
+POST /api/carts/pizza
     - Create new cart with pizza configuration
     - Supports complex topping placement and amounts
+    - Includes country specification for proper pricing
 
-POST /api/carts/:cartId
-    - Add pizza to existing cart
-    - Maintains full configuration details
+POST /api/carts/:cartId/pizza
+    - Add pizza configuration to existing cart
+    - Maintains full configuration details in custom fields
 
 POST /api/orders
     - Create order from cart
     - Includes delivery method and customer information
+    - Handles custom type setup for order fulfillment
 ```
 
 ## 🛠️ Development Setup
@@ -125,7 +135,7 @@ POST /api/orders
    ```bash
    git clone <repository-url>
    cd orderpizza
-   
+
    # Install server dependencies
    npm install
    
@@ -139,15 +149,15 @@ POST /api/orders
    CTP_PROJECT_KEY=your-project-key
    CTP_CLIENT_SECRET=your-client-secret
    CTP_CLIENT_ID=your-client-id
-   CTP_AUTH_URL=https://auth.sphere.io
-   CTP_API_URL=https://api.sphere.io
+   CTP_AUTH_URL=https://auth.europe-west1.gcp.commercetools.com
+   CTP_API_URL=https://api.europe-west1.gcp.commercetools.com
    CTP_SCOPES=your-scopes
    ```
 
 3. **Start Development Servers**
    ```bash
    # Backend server (from root)
-   node server.js
+   npm start
    
    # Frontend server (from client directory)
    cd client && npm start
@@ -155,7 +165,7 @@ POST /api/orders
 
 4. **Access Application**
    - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
+   - Backend API: http://localhost:8001
 
 ### Project Structure
 ```
@@ -164,9 +174,12 @@ orderpizza/
 ├── client/                # React frontend application
 │   ├── src/
 │   │   ├── components/    # React components
-│   │   │   ├── PizzaBuilder.tsx      # Main pizza customization interface
+│   │   │   ├── PizzaBuilderPage.tsx  # Main pizza customization interface
+│   │   │   ├── PizzaBuilder.tsx      # Pizza configuration form
 │   │   │   ├── PizzaVisualizer.tsx   # Interactive pizza preview
 │   │   │   ├── Cart.tsx              # Shopping cart management
+│   │   │   ├── DeliveryMethodModal.tsx # Delivery method selection
+│   │   │   ├── OrderConfirmationModal.tsx # Order confirmation
 │   │   │   └── App.tsx               # Main application component
 │   │   ├── api/          # CommerceTools API client
 │   │   └── types/        # TypeScript interfaces
@@ -178,10 +191,11 @@ orderpizza/
 
 ### Required Product Types
 
-1. **Pizza Product Type**
+1. **Pizza Base Product Type**
    ```json
    {
-     "name": "Pizza",
+     "name": "PizzaBase",
+     "key": "pizza-base",
      "attributes": [
        {
          "name": "availableCrusts",
@@ -190,10 +204,6 @@ orderpizza/
        },
        {
          "name": "crustType", 
-         "type": "text"
-       },
-       {
-         "name": "size",
          "type": "text"
        }
      ]
@@ -204,53 +214,130 @@ orderpizza/
    ```json
    {
      "name": "Ingredient",
+     "key": "ingredient",
      "attributes": [
        {
          "name": "category",
          "type": "text"
        },
        {
-         "name": "isHalfPizzaConfigurable",
+         "name": "halfPizzaEligible",
          "type": "boolean"
-       },
-       {
-         "name": "pizza-size",
-         "type": "enum",
-         "values": ["10\" Small", "12\" Medium", "14\" Large", "16\" XL"]
-       },
-       {
-         "name": "coverage",
-         "type": "enum", 
-         "values": ["Whole Pizza", "Half Pizza"]
        }
      ]
    }
    ```
 
-3. **Categories**
-   - `pizza` - Pizza base products
-   - `sauce` - Sauce ingredients
-   - `cheese` - Cheese ingredients  
-   - `meat` - Meat toppings
-   - `vegetable` - Vegetable toppings
+3. **Sauce Product Type**
+   ```json
+   {
+     "name": "Sauce",
+     "key": "sauce",
+     "attributes": [
+       {
+         "name": "category",
+         "type": "text"
+       }
+     ]
+   }
+   ```
 
-4. **Channels**
-   - Store #9267: Channel for first location
-   - Store #8783: Channel for second location
+### Required Custom Types
+
+1. **Line Item Custom Type** (`lineitemtype`)
+   ```json
+   {
+     "key": "lineitemtype",
+     "name": "Pizza Configuration",
+     "resourceTypeIds": ["line-item"],
+     "fieldDefinitions": [
+       {
+         "name": "Sauce",
+         "type": "String",
+         "required": false
+       },
+       {
+         "name": "Cheese", 
+         "type": "String",
+         "required": false
+       },
+       {
+         "name": "Left",
+         "type": "Set",
+         "elementType": "String",
+         "required": false
+       },
+       {
+         "name": "Whole",
+         "type": "Set", 
+         "elementType": "String",
+         "required": false
+       },
+       {
+         "name": "Right",
+         "type": "Set",
+         "elementType": "String", 
+         "required": false
+       }
+     ]
+   }
+   ```
+
+2. **Cart/Order Custom Type** (`orders`)
+   ```json
+   {
+     "key": "orders",
+     "name": "Orders",
+     "resourceTypeIds": ["order", "cart"],
+     "fieldDefinitions": [
+       {
+         "name": "Method",
+         "type": "Enum",
+         "values": [
+           {"key": "pickup", "label": "Pick Up"},
+           {"key": "delivery", "label": "Delivery"}
+         ],
+         "required": true
+       },
+       {
+         "name": "Driver",
+         "type": "Reference",
+         "referenceTypeId": "customer",
+         "required": false
+       }
+     ]
+   }
+   ```
+
+### Categories
+- `pizza` - Pizza base products
+- `sauce` - Sauce ingredients
+- `cheese` - Cheese ingredients  
+- `meat` - Meat toppings
+- `vegetable` - Vegetable toppings
+
+### Channels
+- Store #9267: Channel for first location
+- Store #8783: Channel for second location
 
 ### Pricing Structure
 Each ingredient requires variants for all size/coverage combinations:
 - 4 sizes × 2 coverage options = 8 variants per ingredient
 - Each variant has channel-specific pricing for both stores
-- Pricing automatically filters to US country only
+- Pricing automatically filters to US country for accurate regional pricing
 
 ## 🎯 Key Features Highlights
 
-### Advanced Topping Placement
-Unlike traditional pizza ordering systems, this application offers granular control over topping placement:
-- **Left Half**: Perfect for sharing pizzas with different preferences
-- **Whole Pizza**: Traditional full-pizza topping coverage
-- **Right Half**: Allows for asymmetric topping combinations
+### Advanced Pizza Configuration
+The application uses a sophisticated data model where:
+- **Pizza bases** are separate products for each size
+- **Ingredients** are individual products with size/coverage variants
+- **Custom line items** store the complete pizza assembly
+- **Real-time pricing** calculates based on selected configuration
+
+### Dual Order Flows
+1. **Add to Cart Flow**: Build multiple pizzas, review in cart, select delivery method, complete order
+2. **Instant Order Flow**: Configure single pizza, immediately select delivery method, complete order
 
 ### Intelligent Pricing
 The pricing system automatically:
@@ -266,6 +353,7 @@ Built on CommerceTools' robust commerce platform:
 - Scalable pricing and product management
 - Multi-channel support for franchise operations
 - Enterprise-grade reliability and performance
+- Custom type support for complex product configurations
 
 ## 📱 Browser Support
 

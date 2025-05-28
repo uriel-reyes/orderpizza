@@ -280,15 +280,16 @@ app.get('/api/products/:id', async (req, res) => {
 // Create cart with pizza configuration (MUST come before /api/carts/:cartId)
 app.post('/api/carts/pizza', async (req, res) => {
   try {
-    const { configuration, deliveryMethod, storeKey, timestamp } = req.body;
-    console.log('------ CREATE CART WITH PIZZA CONFIGURATION ------');
-    console.log('Configuration:', JSON.stringify(configuration, null, 2));
-    console.log('Delivery Method:', deliveryMethod);
+    const { configuration, storeKey, deliveryMethod } = req.body;
+    console.log('------ CREATE PIZZA CART REQUEST ------');
+    console.log('Configuration received:', JSON.stringify(configuration, null, 2));
+    console.log('Configuration.toppings:', configuration.toppings);
     console.log('Store Key:', storeKey);
+    console.log('Delivery Method:', deliveryMethod);
     
     if (!configuration || !configuration.baseProductId || !configuration.variantId) {
       return res.status(400).json({
-        message: 'Invalid pizza configuration: missing baseProductId or variantId',
+        message: 'Invalid configuration: baseProductId and variantId are required',
         statusCode: 400
       });
     }
@@ -407,7 +408,146 @@ app.post('/api/carts/pizza', async (req, res) => {
 
     console.log('Line item custom fields:', JSON.stringify(lineItemCustomFields, null, 2));
 
-    // Create cart body with line-item level custom fields only
+    // Prepare line items array starting with the pizza base
+    const lineItems = [{
+      productId: configuration.baseProductId,
+      variantId: configuration.variantId,
+      quantity: 1,
+      distributionChannel: {
+        key: channelKey,
+        typeId: "channel"
+      },
+      supplyChannel: {
+        key: channelKey,
+        typeId: "channel"
+      },
+      custom: {
+        type: {
+          typeId: "type",
+          key: "lineitemtype"
+        },
+        fields: lineItemCustomFields
+      }
+    }];
+
+    // Helper function to find the correct variant for an ingredient
+    const findIngredientVariant = async (productId, size, coverage) => {
+      try {
+        const productResponse = await apiRoot.products()
+          .withId({ ID: productId })
+          .get()
+          .execute();
+        
+        const product = productResponse.body;
+        const allVariants = [product.masterData.current.masterVariant, ...product.masterData.current.variants];
+        
+        console.log(`Looking for variant with size: ${size}, coverage: ${coverage} for product: ${productId}`);
+        
+        // Find variant that matches size and coverage
+        const variant = allVariants.find(v => {
+          // If the variant doesn't have attributes (like sauce/cheese), use the master variant
+          if (!v.attributes || v.attributes.length === 0) {
+            return v.id === 1; // Use master variant for products without attributes
+          }
+          
+          // For meat/vegetable products, look in attributes for size and coverage
+          const sizeAttr = v.attributes.find(attr => attr.name === 'pizza-size');
+          const coverageAttr = v.attributes.find(attr => attr.name === 'coverage');
+          
+          const variantSize = sizeAttr?.value?.key;
+          const variantCoverage = coverageAttr?.value?.key;
+          
+          return variantSize === size && variantCoverage === coverage;
+        });
+        
+        console.log(`Found variant:`, variant ? {id: variant.id, sku: variant.sku} : 'not found');
+        
+        return variant?.id || 1; // Default to variant 1 if not found
+      } catch (error) {
+        console.error(`Error finding variant for product ${productId}:`, error);
+        return 1; // Default variant
+      }
+    };
+
+    // Get pizza size for ingredient variants
+    const pizzaSize = configuration.baseProductId === '4e4bd51b-5b1d-4e8a-ab09-f125d8b484a4' ? '14' :
+                     configuration.baseProductId === '5499dfd7-b092-453b-8a03-35e21f07ca74' ? '12' :
+                     configuration.baseProductId === 'b8c8e5f1-2a3b-4c5d-6e7f-8a9b0c1d2e3f' ? '10' :
+                     configuration.baseProductId === 'a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d' ? '16' : '14';
+
+    // Add sauce as line item if specified (no channel - country pricing only)
+    if (configuration.sauce && configuration.sauce.productId) {
+      lineItems.push({
+        productId: configuration.sauce.productId,
+        variantId: 1, // Sauce products use master variant
+        quantity: 1
+      });
+    }
+
+    // Add cheese as line item if specified (no channel - country pricing only)
+    if (configuration.cheese?.whole?.productId) {
+      lineItems.push({
+        productId: configuration.cheese.whole.productId,
+        variantId: 1, // Cheese products use master variant
+        quantity: 1
+      });
+    }
+
+    // Add cheese for left side if specified (no channel - country pricing only)
+    if (configuration.cheese?.left?.productId) {
+      lineItems.push({
+        productId: configuration.cheese.left.productId,
+        variantId: 1, // Cheese products use master variant
+        quantity: 1
+      });
+    }
+
+    // Add cheese for right side if specified (no channel - country pricing only)
+    if (configuration.cheese?.right?.productId) {
+      lineItems.push({
+        productId: configuration.cheese.right.productId,
+        variantId: 1, // Cheese products use master variant
+        quantity: 1
+      });
+    }
+
+    // Add toppings as line items (with channel for meat/vegetables)
+    const addToppingsAsLineItems = async (toppings, coverage) => {
+      if (!toppings || !Array.isArray(toppings)) return;
+      
+      for (const topping of toppings) {
+        const toppingInfo = await getProductInfo(topping.productId);
+        if (toppingInfo.category === 'meat' || toppingInfo.category === 'vegetable') {
+          const toppingVariantId = await findIngredientVariant(topping.productId, pizzaSize, coverage);
+          lineItems.push({
+            productId: topping.productId,
+            variantId: toppingVariantId,
+            quantity: 1,
+            distributionChannel: {
+              key: channelKey,
+              typeId: "channel"
+            },
+            supplyChannel: {
+              key: channelKey,
+              typeId: "channel"
+            }
+          });
+        }
+      }
+    };
+
+    // Add toppings for each placement
+    if (configuration.toppings?.left && configuration.toppings.left.length > 0) {
+      await addToppingsAsLineItems(configuration.toppings.left, 'half');
+    }
+    if (configuration.toppings?.whole && configuration.toppings.whole.length > 0) {
+      await addToppingsAsLineItems(configuration.toppings.whole, 'whole');
+    }
+    if (configuration.toppings?.right && configuration.toppings.right.length > 0) {
+      await addToppingsAsLineItems(configuration.toppings.right, 'half');
+    }
+
+    // Create cart body with all line items
     const cartBody = {
       currency: "USD",
       country: "US",
@@ -415,26 +555,7 @@ app.post('/api/carts/pizza', async (req, res) => {
         key: storeKey || "9267",
         typeId: "store"
       },
-      lineItems: [{
-        productId: configuration.baseProductId,
-        variantId: configuration.variantId,
-        quantity: 1,
-        distributionChannel: {
-          key: channelKey,
-          typeId: "channel"
-        },
-        supplyChannel: {
-          key: channelKey,
-          typeId: "channel"
-        },
-        custom: {
-          type: {
-            typeId: "type",
-            key: "lineitemtype"
-          },
-          fields: lineItemCustomFields
-        }
-      }],
+      lineItems: lineItems,
       taxMode: "Platform",
       taxRoundingMode: "HalfEven",
       taxCalculationMode: "LineItemLevel"
@@ -626,6 +747,7 @@ app.post('/api/carts/:cartId/pizza', async (req, res) => {
     console.log('------ ADD PIZZA CONFIGURATION TO CART ------');
     console.log(`Cart ID: ${cartId}`);
     console.log('Configuration:', JSON.stringify(configuration, null, 2));
+    console.log('Configuration.toppings:', configuration.toppings);
     
     if (!configuration || !configuration.baseProductId || !configuration.variantId) {
       return res.status(400).json({

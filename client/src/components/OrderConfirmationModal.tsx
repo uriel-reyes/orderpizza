@@ -53,6 +53,47 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
   // Determine if order is delivery or pickup
   const isDelivery = order.custom?.fields?.Method === 'delivery';
 
+  // Filter line items to only show pizza items (items with custom fields)
+  const pizzaItems = order.lineItems.filter(item => item.custom?.fields);
+
+  // Render pizza configuration from custom fields
+  const renderPizzaConfiguration = (customFields: any) => {
+    const chips = [];
+    
+    // Add sauce
+    if (customFields.Sauce) {
+      chips.push(`Sauce: ${customFields.Sauce}`);
+    }
+    
+    // Add cheese
+    if (customFields.Cheese) {
+      chips.push(`Cheese: ${customFields.Cheese}`);
+    }
+    
+    // Add left half toppings
+    if (customFields.Left && customFields.Left.length > 0) {
+      customFields.Left.forEach((topping: string) => {
+        chips.push(`Left Half: ${topping}`);
+      });
+    }
+    
+    // Add whole pizza toppings
+    if (customFields.Whole && customFields.Whole.length > 0) {
+      customFields.Whole.forEach((topping: string) => {
+        chips.push(`Whole Pizza: ${topping}`);
+      });
+    }
+    
+    // Add right half toppings
+    if (customFields.Right && customFields.Right.length > 0) {
+      customFields.Right.forEach((topping: string) => {
+        chips.push(`Right Half: ${topping}`);
+      });
+    }
+    
+    return chips;
+  };
+
   return (
     <Dialog
       open={open}
@@ -114,40 +155,41 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
         </Typography>
         
         <List disablePadding>
-          {order.lineItems.map((item) => (
-            <Paper key={item.id} elevation={0} variant="outlined" sx={{ mb: 2, overflow: 'hidden' }}>
-              <ListItem sx={{ py: 2, bgcolor: 'grey.50' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                  <PizzaIcon sx={{ mr: 2, color: 'secondary.main' }} />
-                  <ListItemText 
-                    primary={<Typography variant="subtitle1" fontWeight="bold">{item.name.en || 'Pizza'}</Typography>}
-                    secondary={`Qty: ${item.quantity}`}
-                  />
-                  <Typography variant="subtitle1">
-                    {formatPrice(item.totalPrice.centAmount)}
-                  </Typography>
-                </Box>
-              </ListItem>
-              {item.custom?.fields.Ingredients && (
-                <Box sx={{ p: 2 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Ingredients:
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {item.custom.fields.Ingredients.map((ingredient: string) => (
-                      <Chip 
-                        key={ingredient} 
-                        label={ingredient.charAt(0).toUpperCase() + ingredient.slice(1)} 
-                        size="small" 
-                        variant="outlined"
-                        sx={{ fontSize: '0.7rem' }}
-                      />
-                    ))}
+          {pizzaItems.map((item) => {
+            const configurationChips = renderPizzaConfiguration(item.custom?.fields || {});
+            
+            return (
+              <Paper key={item.id} elevation={0} variant="outlined" sx={{ mb: 2, overflow: 'hidden' }}>
+                <ListItem sx={{ py: 2, bgcolor: 'grey.50' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                    <PizzaIcon sx={{ mr: 2, color: 'secondary.main' }} />
+                    <ListItemText 
+                      primary={<Typography variant="subtitle1" fontWeight="bold">Pizza</Typography>}
+                      secondary={`Qty: ${item.quantity}`}
+                    />
+                    <Typography variant="subtitle1">
+                      {formatPrice(item.totalPrice.centAmount)}
+                    </Typography>
                   </Box>
-                </Box>
-              )}
-            </Paper>
-          ))}
+                </ListItem>
+                {configurationChips.length > 0 && (
+                  <Box sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {configurationChips.map((chip, index) => (
+                        <Chip 
+                          key={index} 
+                          label={chip} 
+                          size="small" 
+                          variant="outlined"
+                          sx={{ fontSize: '0.7rem' }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Paper>
+            );
+          })}
         </List>
         
         <Divider sx={{ my: 2 }} />
