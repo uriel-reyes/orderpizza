@@ -450,7 +450,7 @@ export const createOrder = async (
 /**
  * Default product ID to use when none is specified
  */
-export const DEFAULT_PRODUCT_ID = '98873a7d-1358-45ad-adb7-84ef4bf666af';
+export const DEFAULT_PRODUCT_ID = '98873a7d-1358-45ad-adb7-84ef4bf666af'; 
 
 /**
  * Interface for ingredient products
@@ -602,17 +602,27 @@ export const fetchIngredients = async (category?: string, channelId?: string): P
  * Creates a cart with a configured pizza
  * @param configuration - The pizza configuration
  * @param deliveryMethod - Optional delivery method
+ * @param selectedChannelId - Optional channel ID for store selection
  * @returns Promise resolving to the created cart
  */
 export const createCartWithPizza = async (
   configuration: PizzaConfiguration,
-  deliveryMethod?: 'pickup' | 'delivery'
+  deliveryMethod?: 'pickup' | 'delivery',
+  selectedChannelId?: string
 ): Promise<Cart> => {
   try {
+    // Map channel ID to store key if needed
+    const channelToStoreMap: { [key: string]: string } = {
+      'afb03151-1faa-4ec9-9594-3e3580d30da9': '9267', // Store #9267
+      'a0406014-2935-4083-958f-8741768a40c2': '8783'  // Store #8783
+    };
+    
+    const storeKey = selectedChannelId ? (channelToStoreMap[selectedChannelId] || '9267') : '9267';
+    
     const response = await axios.post<Cart>(`${API_BASE}/carts/pizza`, {
       configuration,
       deliveryMethod,
-      storeKey: '9267',
+      storeKey,
       timestamp: new Date().toISOString()
     });
     return response.data;

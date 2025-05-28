@@ -277,6 +277,259 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
+// Create cart with pizza configuration (MUST come before /api/carts/:cartId)
+app.post('/api/carts/pizza', async (req, res) => {
+  try {
+    const { configuration, deliveryMethod, storeKey, timestamp } = req.body;
+    console.log('------ CREATE CART WITH PIZZA CONFIGURATION ------');
+    console.log('Configuration:', JSON.stringify(configuration, null, 2));
+    console.log('Delivery Method:', deliveryMethod);
+    console.log('Store Key:', storeKey);
+    
+    if (!configuration || !configuration.baseProductId || !configuration.variantId) {
+      return res.status(400).json({
+        message: 'Invalid pizza configuration: missing baseProductId or variantId',
+        statusCode: 400
+      });
+    }
+
+    // Helper function to get product category and name
+    const getProductInfo = async (productId) => {
+      try {
+        const productResponse = await apiRoot
+          .products()
+          .withId({ ID: productId })
+          .get()
+          .execute();
+        
+        const product = productResponse.body;
+        const productName = product.masterData.current.name['en-US'];
+        
+        // Get category information
+        const categories = product.masterData.current.categories;
+        let category = 'unknown';
+        
+        if (categories && categories.length > 0) {
+          // Get the first category to determine type
+          const categoryResponse = await apiRoot
+            .categories()
+            .withId({ ID: categories[0].id })
+            .get()
+            .execute();
+          
+          const categoryKey = categoryResponse.body.key;
+          
+          // Map category keys to our field types
+          if (categoryKey === 'sauce') category = 'sauce';
+          else if (categoryKey === 'cheese') category = 'cheese';
+          else if (categoryKey === 'meats') category = 'meat';
+          else if (categoryKey === 'vegetables') category = 'vegetable';
+        }
+        
+        return { name: productName, category };
+      } catch (err) {
+        console.error(`Error fetching product ${productId}:`, err.message);
+        return { name: 'Unknown Product', category: 'unknown' };
+      }
+    };
+
+    // Map store key to channel key (not ID)
+    const storeToChannelMap = {
+      '9267': '9267',
+      '8783': '8783'
+    };
+    const channelKey = storeToChannelMap[storeKey] || storeToChannelMap['9267'];
+
+    // Build line item custom fields based on pizza configuration
+    const lineItemCustomFields = {
+      Sauce: '',
+      Cheese: '',
+      Left: [],
+      Whole: [],
+      Right: []
+    };
+
+    // Process sauce
+    if (configuration.sauce?.productId) {
+      const sauceInfo = await getProductInfo(configuration.sauce.productId);
+      if (sauceInfo.category === 'sauce') {
+        lineItemCustomFields.Sauce = configuration.sauce.amount || 'normal';
+      }
+    }
+
+    // Process cheese
+    if (configuration.cheese?.whole?.productId) {
+      const cheeseInfo = await getProductInfo(configuration.cheese.whole.productId);
+      if (cheeseInfo.category === 'cheese') {
+        lineItemCustomFields.Cheese = configuration.cheese.whole.amount || 'normal';
+      }
+    }
+    if (configuration.cheese?.left?.productId) {
+      const cheeseInfo = await getProductInfo(configuration.cheese.left.productId);
+      if (cheeseInfo.category === 'cheese') {
+        lineItemCustomFields.Left.push(`${cheeseInfo.name} (${configuration.cheese.left.amount || 'normal'})`);
+      }
+    }
+    if (configuration.cheese?.right?.productId) {
+      const cheeseInfo = await getProductInfo(configuration.cheese.right.productId);
+      if (cheeseInfo.category === 'cheese') {
+        lineItemCustomFields.Right.push(`${cheeseInfo.name} (${configuration.cheese.right.amount || 'normal'})`);
+      }
+    }
+
+    // Process toppings (meats and vegetables)
+    if (configuration.toppings?.left) {
+      for (const topping of configuration.toppings.left) {
+        const toppingInfo = await getProductInfo(topping.productId);
+        if (toppingInfo.category === 'meat' || toppingInfo.category === 'vegetable') {
+          lineItemCustomFields.Left.push(`${toppingInfo.name} (${topping.amount || 'normal'})`);
+        }
+      }
+    }
+    
+    if (configuration.toppings?.whole) {
+      for (const topping of configuration.toppings.whole) {
+        const toppingInfo = await getProductInfo(topping.productId);
+        if (toppingInfo.category === 'meat' || toppingInfo.category === 'vegetable') {
+          lineItemCustomFields.Whole.push(`${toppingInfo.name} (${topping.amount || 'normal'})`);
+        }
+      }
+    }
+    
+    if (configuration.toppings?.right) {
+      for (const topping of configuration.toppings.right) {
+        const toppingInfo = await getProductInfo(topping.productId);
+        if (toppingInfo.category === 'meat' || toppingInfo.category === 'vegetable') {
+          lineItemCustomFields.Right.push(`${toppingInfo.name} (${topping.amount || 'normal'})`);
+        }
+      }
+    }
+
+    console.log('Line item custom fields:', JSON.stringify(lineItemCustomFields, null, 2));
+
+    // Create cart body with line-item level custom fields only
+    const cartBody = {
+      currency: "USD",
+      country: "US",
+      store: {
+        key: storeKey || "9267",
+        typeId: "store"
+      },
+      lineItems: [{
+        productId: configuration.baseProductId,
+        variantId: configuration.variantId,
+        quantity: 1,
+        distributionChannel: {
+          key: channelKey,
+          typeId: "channel"
+        },
+        supplyChannel: {
+          key: channelKey,
+          typeId: "channel"
+        },
+        custom: {
+          type: {
+            typeId: "type",
+            key: "lineitemtype"
+          },
+          fields: lineItemCustomFields
+        }
+      }],
+      taxMode: "Platform",
+      taxRoundingMode: "HalfEven",
+      taxCalculationMode: "LineItemLevel"
+    };
+
+    console.log('Cart request payload:', JSON.stringify(cartBody, null, 2));
+
+    const cartResponse = await apiRoot.carts().post({
+      body: cartBody
+    }).execute();
+
+    console.log('------ CART WITH PIZZA CREATED SUCCESSFULLY ------');
+    console.log('Cart ID:', cartResponse.body.id);
+    console.log('Cart Version:', cartResponse.body.version);
+
+    res.json(cartResponse.body);
+  } catch (error) {
+    console.error('------ CART WITH PIZZA CREATION ERROR ------');
+    console.error('Error creating cart with pizza:', error);
+    res.status(500).json({
+      message: error.message || 'Failed to create cart with pizza',
+      statusCode: 500
+    });
+  }
+});
+
+// Add pizza to existing cart
+app.post('/api/carts/:cartId', async (req, res) => {
+  try {
+    const { cartId } = req.params;
+    const { version, productId, variantId, quantity, ingredients, timestamp } = req.body;
+    console.log('------ ADD TO CART REQUEST ------');
+    console.log(`Adding pizza to cart ${cartId}. ProductID: ${productId}, VariantID: ${variantId}, Ingredients: ${ingredients ? ingredients.join(', ') : 'none'}`);
+    console.log('Request received at:', new Date().toISOString());
+    console.log('Client timestamp:', timestamp);
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    // Prepare cart update request
+    const cartUpdateBody = {
+      version: version,
+      actions: [{
+        action: "addLineItem",
+        productId: productId,
+        variantId: variantId,
+        quantity: quantity || 1,
+        distributionChannel: {
+          key: "9267",
+          typeId: "channel"
+        },
+        supplyChannel: {
+          key: "9267",
+          typeId: "channel"
+        },
+        custom: {
+          type: {
+            typeId: "type",
+            key: "lineitemtype"
+          },
+          fields: {
+            "Ingredients": ingredients || []
+          }
+        }
+      }]
+    };
+    
+    console.log('Cart update payload:', JSON.stringify(cartUpdateBody, null, 2));
+    
+    // Add product to cart via Commercetools API
+    const cartResponse = await apiRoot.carts()
+      .withId({ ID: cartId })
+      .post({
+        body: cartUpdateBody
+      }).execute();
+    
+    console.log('------ CART UPDATED SUCCESSFULLY ------');
+    console.log('Cart ID:', cartResponse.body.id);
+    console.log('Cart Version:', cartResponse.body.version);
+    console.log('Line Items Count:', cartResponse.body.lineItems.length);
+    console.log('Line Items:', JSON.stringify(cartResponse.body.lineItems, null, 2));
+    
+    res.json(cartResponse.body);
+  } catch (error) {
+    console.error('------ CART UPDATE ERROR ------');
+    console.error('Error adding to cart:', error);
+    console.error('Error details:', error.message);
+    if (error.response) {
+      console.error('Error response:', error.response);
+    }
+    res.status(500).json({ 
+      message: error.message || 'Failed to add to cart',
+      statusCode: 500
+    });
+  }
+});
+
 // Create a new cart
 app.post('/api/carts', async (req, res) => {
   try {
@@ -293,6 +546,7 @@ app.post('/api/carts', async (req, res) => {
     // Create a cart via Commercetools API
     const cartBody = {
       currency: "USD",
+      country: "US",
       store: {
         key: storeKey || "9267",
         typeId: "store"
@@ -312,10 +566,10 @@ app.post('/api/carts', async (req, res) => {
         custom: {
           type: {
             typeId: "type",
-            key: "lineitemtype",
+            key: "lineitemtype"
           },
           fields: {
-            "Ingredients": ingredients
+            "Ingredients": ingredients || []
           }
         }
       }],
@@ -329,7 +583,7 @@ app.post('/api/carts', async (req, res) => {
       cartBody.custom = {
         type: {
           typeId: "type",
-          id: "5267f324-8d56-410f-8f4b-fa5898b1efe1"
+          key: "orders"
         },
         fields: {
           Method: deliveryMethod
@@ -364,25 +618,136 @@ app.post('/api/carts', async (req, res) => {
   }
 });
 
-// Add pizza to existing cart
-app.post('/api/carts/:cartId', async (req, res) => {
+// Add pizza configuration to existing cart
+app.post('/api/carts/:cartId/pizza', async (req, res) => {
   try {
     const { cartId } = req.params;
-    const { version, productId, variantId, quantity, ingredients, timestamp } = req.body;
-    console.log('------ ADD TO CART REQUEST ------');
-    console.log(`Adding pizza to cart ${cartId}. ProductID: ${productId}, VariantID: ${variantId}, Ingredients: ${ingredients.join(', ')}`);
-    console.log('Request received at:', new Date().toISOString());
-    console.log('Client timestamp:', timestamp);
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    const { version, configuration, timestamp } = req.body;
+    console.log('------ ADD PIZZA CONFIGURATION TO CART ------');
+    console.log(`Cart ID: ${cartId}`);
+    console.log('Configuration:', JSON.stringify(configuration, null, 2));
     
-    // Prepare cart update request
+    if (!configuration || !configuration.baseProductId || !configuration.variantId) {
+      return res.status(400).json({
+        message: 'Invalid pizza configuration: missing baseProductId or variantId',
+        statusCode: 400
+      });
+    }
+
+    // Helper function to get product category and name
+    const getProductInfo = async (productId) => {
+      try {
+        const productResponse = await apiRoot
+          .products()
+          .withId({ ID: productId })
+          .get()
+          .execute();
+        
+        const product = productResponse.body;
+        const productName = product.masterData.current.name['en-US'];
+        
+        // Get category information
+        const categories = product.masterData.current.categories;
+        let category = 'unknown';
+        
+        if (categories && categories.length > 0) {
+          // Get the first category to determine type
+          const categoryResponse = await apiRoot
+            .categories()
+            .withId({ ID: categories[0].id })
+            .get()
+            .execute();
+          
+          const categoryKey = categoryResponse.body.key;
+          
+          // Map category keys to our field types
+          if (categoryKey === 'sauce') category = 'sauce';
+          else if (categoryKey === 'cheese') category = 'cheese';
+          else if (categoryKey === 'meats') category = 'meat';
+          else if (categoryKey === 'vegetables') category = 'vegetable';
+        }
+        
+        return { name: productName, category };
+      } catch (err) {
+        console.error(`Error fetching product ${productId}:`, err.message);
+        return { name: 'Unknown Product', category: 'unknown' };
+      }
+    };
+
+    // Build line item custom fields based on pizza configuration
+    const lineItemCustomFields = {
+      Sauce: '',
+      Cheese: '',
+      Left: [],
+      Whole: [],
+      Right: []
+    };
+
+    // Process sauce
+    if (configuration.sauce?.productId) {
+      const sauceInfo = await getProductInfo(configuration.sauce.productId);
+      if (sauceInfo.category === 'sauce') {
+        lineItemCustomFields.Sauce = configuration.sauce.amount || 'normal';
+      }
+    }
+
+    // Process cheese
+    if (configuration.cheese?.whole?.productId) {
+      const cheeseInfo = await getProductInfo(configuration.cheese.whole.productId);
+      if (cheeseInfo.category === 'cheese') {
+        lineItemCustomFields.Cheese = configuration.cheese.whole.amount || 'normal';
+      }
+    }
+    if (configuration.cheese?.left?.productId) {
+      const cheeseInfo = await getProductInfo(configuration.cheese.left.productId);
+      if (cheeseInfo.category === 'cheese') {
+        lineItemCustomFields.Left.push(`${cheeseInfo.name} (${configuration.cheese.left.amount || 'normal'})`);
+      }
+    }
+    if (configuration.cheese?.right?.productId) {
+      const cheeseInfo = await getProductInfo(configuration.cheese.right.productId);
+      if (cheeseInfo.category === 'cheese') {
+        lineItemCustomFields.Right.push(`${cheeseInfo.name} (${configuration.cheese.right.amount || 'normal'})`);
+      }
+    }
+
+    // Process toppings (meats and vegetables)
+    if (configuration.toppings?.left) {
+      for (const topping of configuration.toppings.left) {
+        const toppingInfo = await getProductInfo(topping.productId);
+        if (toppingInfo.category === 'meat' || toppingInfo.category === 'vegetable') {
+          lineItemCustomFields.Left.push(`${toppingInfo.name} (${topping.amount || 'normal'})`);
+        }
+      }
+    }
+    
+    if (configuration.toppings?.whole) {
+      for (const topping of configuration.toppings.whole) {
+        const toppingInfo = await getProductInfo(topping.productId);
+        if (toppingInfo.category === 'meat' || toppingInfo.category === 'vegetable') {
+          lineItemCustomFields.Whole.push(`${toppingInfo.name} (${topping.amount || 'normal'})`);
+        }
+      }
+    }
+    
+    if (configuration.toppings?.right) {
+      for (const topping of configuration.toppings.right) {
+        const toppingInfo = await getProductInfo(topping.productId);
+        if (toppingInfo.category === 'meat' || toppingInfo.category === 'vegetable') {
+          lineItemCustomFields.Right.push(`${toppingInfo.name} (${topping.amount || 'normal'})`);
+        }
+      }
+    }
+
+    console.log('Line item custom fields:', JSON.stringify(lineItemCustomFields, null, 2));
+
     const cartUpdateBody = {
       version: version,
       actions: [{
         action: "addLineItem",
-        productId: productId,
-        variantId: variantId,
-        quantity: quantity || 1,
+        productId: configuration.baseProductId,
+        variantId: configuration.variantId,
+        quantity: 1,
         distributionChannel: {
           key: "9267",
           typeId: "channel"
@@ -394,40 +759,31 @@ app.post('/api/carts/:cartId', async (req, res) => {
         custom: {
           type: {
             typeId: "type",
-            key: "lineitemtype",
+            key: "lineitemtype"
           },
-          fields: {
-            "Ingredients": ingredients
-          }
+          fields: lineItemCustomFields
         }
       }]
     };
-    
+
     console.log('Cart update payload:', JSON.stringify(cartUpdateBody, null, 2));
-    
-    // Add product to cart via Commercetools API
+
     const cartResponse = await apiRoot.carts()
       .withId({ ID: cartId })
       .post({
         body: cartUpdateBody
       }).execute();
-    
-    console.log('------ CART UPDATED SUCCESSFULLY ------');
+
+    console.log('------ PIZZA ADDED TO CART SUCCESSFULLY ------');
     console.log('Cart ID:', cartResponse.body.id);
     console.log('Cart Version:', cartResponse.body.version);
-    console.log('Line Items Count:', cartResponse.body.lineItems.length);
-    console.log('Line Items:', JSON.stringify(cartResponse.body.lineItems, null, 2));
-    
+
     res.json(cartResponse.body);
   } catch (error) {
-    console.error('------ CART UPDATE ERROR ------');
-    console.error('Error adding to cart:', error);
-    console.error('Error details:', error.message);
-    if (error.response) {
-      console.error('Error response:', error.response);
-    }
-    res.status(500).json({ 
-      message: error.message || 'Failed to add to cart',
+    console.error('------ ADD PIZZA TO CART ERROR ------');
+    console.error('Error adding pizza to cart:', error);
+    res.status(500).json({
+      message: error.message || 'Failed to add pizza to cart',
       statusCode: 500
     });
   }
@@ -552,9 +908,14 @@ app.post('/api/orders', async (req, res) => {
     // Only add or update the Method field if needed
     if (!existingMethod && methodToUse) {
       cartUpdateActions.push({
-        action: "setCustomField",
-        name: "Method",
-        value: methodToUse
+        action: "setCustomType",
+        type: {
+          typeId: "type",
+          key: "orders"
+        },
+        fields: {
+          Method: methodToUse
+        }
       });
     }
     

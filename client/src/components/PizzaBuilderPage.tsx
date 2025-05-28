@@ -104,7 +104,7 @@ const PizzaBuilderPage: React.FC<PizzaBuilderPageProps> = ({
       
       if (!cart) {
         // Create new cart with pizza
-        newCart = await createCartWithPizza(configuration);
+        newCart = await createCartWithPizza(configuration, undefined, selectedChannelId);
       } else {
         // Add pizza to existing cart
         newCart = await addPizzaToCartAdvanced(cart.id, cart.version, configuration);
@@ -152,20 +152,14 @@ const PizzaBuilderPage: React.FC<PizzaBuilderPageProps> = ({
     try {
       setOrderLoading(true);
       
-      // Create cart with pizza if one doesn't exist
-      let orderCart = cart;
-      
-      if (!orderCart) {
-        orderCart = await createCartWithPizza(configuration, method);
-        setCart(orderCart);
-      }
+      // Always create a new cart with pizza for instant orders
+      const orderCart = await createCartWithPizza(configuration, method, selectedChannelId);
       
       // Create order
       const customer = generateRandomCustomer();
       const order = await createOrder(orderCart.id, orderCart.version, method);
       
       setOrderDetails(order);
-      setCart(null); // Clear cart after successful order
       setDeliveryMethodOpen(false);
       setOrderConfirmationOpen(true);
       

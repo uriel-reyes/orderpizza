@@ -126,12 +126,12 @@ function App() {
         </AppBar>
         
         <PizzaBuilderPage
-          cart={cart}
-          setCart={setCart}
-          cartOpen={cartOpen}
-          setCartOpen={setCartOpen}
+            cart={cart}
+            setCart={setCart}
+            cartOpen={cartOpen}
+            setCartOpen={setCartOpen}
           selectedChannelId={getSelectedChannelId()}
-        />
+          />
       </Box>
     </ThemeProvider>
   );

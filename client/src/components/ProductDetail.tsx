@@ -311,10 +311,10 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
       let order;
       try {
         order = await createOrder(
-          orderCart.id,
-          orderCart.version,
-          method
-        );
+        orderCart.id,
+        orderCart.version,
+        method
+      );
       } catch (err) {
         // Check if it's a version mismatch error
         if (err instanceof Error && err.message.includes('different version than expected')) {
