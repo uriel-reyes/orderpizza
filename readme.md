@@ -417,39 +417,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <p align="center">
   Built with ❤️ using CommerceTools, React, and Material UI
 </p>
-
-## 🔍 Technical Implementation Notes
-
-### Channel and Pricing Implementation
-- New carts created with `createCartWithPizza()` use the selected channel ID from the store selector
-- Additional items added to existing carts default to the primary store channel (Store #9267)
-- Sauce and cheese items are added without channel information in cart creation to avoid pricing conflicts
-- Meat and vegetable toppings always include distribution and supply channel information
-- Channel selection affects all API calls for fetching products and ingredients
-
-### Custom Fields Implementation
-- Custom fields are populated in both server-side and client-side code:
-  - Client-side tracks ingredient selection and amounts
-  - Server-side retrieves product names via API calls for display
-  - Both 'Sauce-Type' and 'Cheese-Type' fields are explicitly set in requests
-- Each line item contains its complete configuration data in custom fields
-- Client components like Cart and OrderConfirmationModal display these custom fields
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### Channel and Pricing Issues
-- **No prices found for channel**: Ensure products have prices for the specific channel you're using
-- **Inconsistent pricing**: Check if different components of a pizza are using different channels
-- **Price not updating with store**: Verify the channel ID is being passed correctly in API calls
-
-#### Custom Field Issues
-- **Missing sauce or cheese types**: Check the server code to ensure product names are being retrieved
-- **Custom fields not showing**: Verify the Cart and OrderConfirmationModal components properly access custom fields
-- **Incorrect field names**: Ensure field names match exactly (case-sensitive) with the custom type definition
-
-#### Server and API Issues
-- **Cart creation failures**: Check server logs for details on missing required fields
-- **CommerceTools API errors**: Verify your API credentials and project configuration
-- **Timeout errors**: Consider optimizing server code to reduce API calls when creating complex pizza configurations
