@@ -16,6 +16,15 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
 - **Geographic Pricing**: Automatic US country filtering for accurate regional pricing
 - **Store-Specific Inventory**: Each store maintains its own product availability and pricing
 
+#### Channel Implementation
+- **Store-Specific Channel IDs**: Each store is associated with a specific channel ID
+  - Store #9267: `afb03151-1faa-4ec9-9594-3e3580d30da9`
+  - Store #8783: `a0406014-2935-4083-958f-8741768a40c2`
+- **Pricing Behavior**:
+  - New carts respect selected channel/store
+  - Adding to existing carts uses the default store (Store #9267)
+- **Price Consistency**: Ingredients in the same cart maintain consistent pricing via channel selection
+
 ### 🍕 Advanced Pizza Customization
 
 #### Size & Crust Selection
@@ -79,6 +88,11 @@ A modern, responsive pizza ordering application powered by CommerceTools API. Th
   - Channel-specific pricing retrieval
   - Cart and order management with custom types
   - Real-time inventory synchronization
+  - Storage of ingredient names (sauce, cheese) in custom fields
+- **Custom Field Management**:
+  - Sauce and cheese types stored as 'Sauce-Type' and 'Cheese-Type' fields
+  - Topping placements tracked by position (Left, Whole, Right)
+  - Amount tracking for all ingredients (light, normal, extra)
 
 #### Data Architecture
 - **Pizza Base Products**: Individual products for each size (10", 12", 14", 16")
@@ -112,15 +126,20 @@ POST /api/carts/pizza
     - Create new cart with pizza configuration
     - Supports complex topping placement and amounts
     - Includes country specification for proper pricing
+    - Captures specific sauce and cheese type selections via 'Sauce-Type' and 'Cheese-Type' fields
+    - Uses channel ID for store-specific pricing
 
 POST /api/carts/:cartId/pizza
     - Add pizza configuration to existing cart
     - Maintains full configuration details in custom fields
+    - Preserves sauce and cheese type information
+    - Uses default channel ID (Store #9267) for consistent pricing
 
 POST /api/orders
     - Create order from cart
     - Includes delivery method and customer information
     - Handles custom type setup for order fulfillment
+    - Generates random customer information for demo purposes
 ```
 
 ## 🛠️ Development Setup
@@ -346,6 +365,13 @@ The application uses a sophisticated data model where:
 - **Custom line items** store the complete pizza assembly
 - **Real-time pricing** calculates based on selected configuration
 - **Ingredient tracking** captures detailed information about selected sauce and cheese types
+- **Custom fields** store specific product names for sauce and cheese, not just amounts
+
+### Custom Fields Management
+- **Enhanced ingredient tracking** with fields for both ingredient types and amounts
+- **Dedicated fields** for specific sauce and cheese product names (Sauce-Type, Cheese-Type)
+- **Placement-specific fields** for tracking toppings on different parts of the pizza
+- **Consistent display** of configurations in cart and order confirmation
 
 ### Dual Order Flows
 1. **Add to Cart Flow**: Build multiple pizzas, review in cart, select delivery method, complete order
@@ -391,3 +417,39 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <p align="center">
   Built with ❤️ using CommerceTools, React, and Material UI
 </p>
+
+## 🔍 Technical Implementation Notes
+
+### Channel and Pricing Implementation
+- New carts created with `createCartWithPizza()` use the selected channel ID from the store selector
+- Additional items added to existing carts default to the primary store channel (Store #9267)
+- Sauce and cheese items are added without channel information in cart creation to avoid pricing conflicts
+- Meat and vegetable toppings always include distribution and supply channel information
+- Channel selection affects all API calls for fetching products and ingredients
+
+### Custom Fields Implementation
+- Custom fields are populated in both server-side and client-side code:
+  - Client-side tracks ingredient selection and amounts
+  - Server-side retrieves product names via API calls for display
+  - Both 'Sauce-Type' and 'Cheese-Type' fields are explicitly set in requests
+- Each line item contains its complete configuration data in custom fields
+- Client components like Cart and OrderConfirmationModal display these custom fields
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### Channel and Pricing Issues
+- **No prices found for channel**: Ensure products have prices for the specific channel you're using
+- **Inconsistent pricing**: Check if different components of a pizza are using different channels
+- **Price not updating with store**: Verify the channel ID is being passed correctly in API calls
+
+#### Custom Field Issues
+- **Missing sauce or cheese types**: Check the server code to ensure product names are being retrieved
+- **Custom fields not showing**: Verify the Cart and OrderConfirmationModal components properly access custom fields
+- **Incorrect field names**: Ensure field names match exactly (case-sensitive) with the custom type definition
+
+#### Server and API Issues
+- **Cart creation failures**: Check server logs for details on missing required fields
+- **CommerceTools API errors**: Verify your API credentials and project configuration
+- **Timeout errors**: Consider optimizing server code to reduce API calls when creating complex pizza configurations
